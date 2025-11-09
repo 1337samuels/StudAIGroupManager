@@ -287,6 +287,11 @@ class AzureADLogin:
 
             print(f"  Final URL: {response.url}")
 
+            # Save initial response for debugging
+            with open('initial_response.html', 'w', encoding='utf-8') as f:
+                f.write(response.text)
+            print(f"  Saved initial response to initial_response.html")
+
             # Check if we're already authenticated (no login required)
             final_url = response.url.lower()
             if 'learning.london.edu' in final_url or 'london.instructure.com' in final_url:
@@ -299,6 +304,7 @@ class AzureADLogin:
             saml_form, saml_action = self.extract_saml_form(response.text)
             if saml_form and saml_action:
                 print("  Detected SAML SSO flow, submitting SAML request...")
+                print(f"  SAML form fields: {list(saml_form.keys())}")
 
                 # Make action URL absolute
                 saml_action = self.make_absolute_url(saml_action, response.url)
@@ -312,6 +318,13 @@ class AzureADLogin:
                     return None
 
                 print(f"  After SAML: {response.url}")
+            else:
+                print("  No SAML form detected in initial response")
+                print(f"  Response contains {len(response.text)} characters")
+                if 'SAMLRequest' in response.text:
+                    print("  WARNING: Found 'SAMLRequest' in text but not in form!")
+                if 'SAMLResponse' in response.text:
+                    print("  WARNING: Found 'SAMLResponse' in text but not in form!")
 
             # Check if we reached a Microsoft login page
             if 'login.microsoftonline.com' not in response.url:
