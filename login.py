@@ -445,15 +445,23 @@ class AzureADLogin:
             if 'Authenticator' in response.text or 'ConvergedTFA' in response.text or 'PhoneAppNotification' in response.text:
                 print("\n[4/5] Microsoft Authenticator required...")
 
+                # Save the MFA page for debugging
+                with open('mfa_page.html', 'w', encoding='utf-8') as f:
+                    f.write(response.text)
+                print(f"  Saved MFA page to mfa_page.html for debugging")
+
                 # Check if we need to initiate auth first (BeginAuth)
                 config = self.extract_config_from_script(response.text)
                 if config and 'urlBeginAuth' in config:
                     print("  Initiating authentication request...")
+                    print(f"  Config keys found: {list(config.keys())[:20]}")  # Debug: show config keys
 
                     # Build form data and call BeginAuth (use MFA-specific form data)
                     form_data = self.build_form_data_from_config(config, for_mfa=True)
                     form_data['AuthMethodId'] = 'PhoneAppNotification'
                     form_data['Method'] = 'BeginAuth'
+                    print(f"  Form data keys: {list(form_data.keys())}")  # Debug: show what we're sending
+                    print(f"  Form data fields: {form_data}")  # Debug: show full form data
 
                     begin_url = config['urlBeginAuth']
                     begin_url = self.make_absolute_url(begin_url, response.url)

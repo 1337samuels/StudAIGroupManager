@@ -4,6 +4,7 @@ session.json
 last_response.html
 initial_response.html
 begin_auth_response.html
+mfa_page.html
 
 # Python
 __pycache__/
