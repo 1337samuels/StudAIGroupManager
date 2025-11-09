@@ -522,11 +522,33 @@ class AzureADLogin:
 
                         # Loop will continue and check if we're still on ConvergedTFA at the top
 
-                    # After loop exits, we should have the approval page
+                    # After loop exits, we should have the approval page or need to call BeginAuth
                     if mfa_redirect_count >= max_mfa_redirects:
                         print(f"  Warning: Reached maximum MFA redirects ({max_mfa_redirects})")
                     else:
                         print(f"  Successfully exited MFA redirect loop after {mfa_redirect_count} attempts")
+
+                    # If still on ConvergedTFA, we need to call BeginAuth to initiate the push
+                    if 'ConvergedTFA' in response.text:
+                        print("\n  Still on ConvergedTFA page - calling BeginAuth to initiate MFA push...")
+                        config = self.extract_config_from_script(response.text)
+                        if config and 'urlBeginAuth' in config:
+                            # Build form data and call BeginAuth
+                            form_data = self.build_form_data_from_config(config, for_mfa=True)
+                            form_data['Method'] = 'BeginAuth'
+                            form_data['AuthMethodId'] = 'PhoneAppNotification'
+
+                            begin_url = config['urlBeginAuth']
+                            begin_url = self.make_absolute_url(begin_url, response.url)
+                            print(f"  Calling BeginAuth at: {begin_url}")
+
+                            response = self.session.post(begin_url, data=form_data, allow_redirects=True)
+                            print(f"  BeginAuth response status: {response.status_code}")
+
+                            # Save BeginAuth response
+                            with open('begin_auth_response.html', 'w', encoding='utf-8') as f:
+                                f.write(response.text)
+                            print(f"  Saved BeginAuth response to begin_auth_response.html")
 
                 # Now wait for approval
                 response = self.wait_for_auth_approval(response)
