@@ -301,6 +301,11 @@ class AzureADLogin:
 
             if response.status_code != 200:
                 print(f"Error: Failed to access application (status {response.status_code})")
+                # Save error response for debugging
+                with open('initial_error_response.html', 'w', encoding='utf-8') as f:
+                    f.write(response.text[:5000])  # First 5000 chars
+                print(f"  Saved error response to initial_error_response.html")
+                print(f"  Response URL: {response.url}")
                 return None
 
             # Show redirect chain
