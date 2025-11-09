@@ -300,31 +300,43 @@ class AzureADLogin:
                     print(f"  Cookies: {len(self.session.cookies)} cookie(s) stored")
                     return self.session
 
-            # Check for SAML auto-submit form
-            saml_form, saml_action = self.extract_saml_form(response.text)
-            if saml_form and saml_action:
-                print("  Detected SAML SSO flow, submitting SAML request...")
-                print(f"  SAML form fields: {list(saml_form.keys())}")
+            # Check for SAML redirect in config (BssoInterrupt page)
+            config = self.extract_config_from_script(response.text)
+            if config and 'urlPost' in config and 'SAMLRequest' in config.get('urlPost', ''):
+                print("  Detected SAML SSO flow (GET redirect)...")
 
-                # Make action URL absolute
-                saml_action = self.make_absolute_url(saml_action, response.url)
-                print(f"  SAML target: {saml_action}")
+                # Get SAML redirect URL from config
+                saml_url = config['urlPost']
+                saml_url = self.make_absolute_url(saml_url, response.url)
+                print(f"  SAML target: {saml_url[:100]}...")
 
-                # Submit SAML form
-                response = self.session.post(saml_action, data=saml_form, allow_redirects=True)
+                # Follow SAML redirect with GET
+                response = self.session.get(saml_url, allow_redirects=True)
 
                 if response.status_code != 200:
-                    print(f"Error: SAML submission failed (status {response.status_code})")
+                    print(f"Error: SAML redirect failed (status {response.status_code})")
                     return None
 
                 print(f"  After SAML: {response.url}")
             else:
-                print("  No SAML form detected in initial response")
-                print(f"  Response contains {len(response.text)} characters")
-                if 'SAMLRequest' in response.text:
-                    print("  WARNING: Found 'SAMLRequest' in text but not in form!")
-                if 'SAMLResponse' in response.text:
-                    print("  WARNING: Found 'SAMLResponse' in text but not in form!")
+                # Try form-based SAML as fallback
+                saml_form, saml_action = self.extract_saml_form(response.text)
+                if saml_form and saml_action:
+                    print("  Detected SAML SSO flow (POST form)...")
+                    print(f"  SAML form fields: {list(saml_form.keys())}")
+
+                    # Make action URL absolute
+                    saml_action = self.make_absolute_url(saml_action, response.url)
+                    print(f"  SAML target: {saml_action}")
+
+                    # Submit SAML form
+                    response = self.session.post(saml_action, data=saml_form, allow_redirects=True)
+
+                    if response.status_code != 200:
+                        print(f"Error: SAML submission failed (status {response.status_code})")
+                        return None
+
+                    print(f"  After SAML: {response.url}")
 
             # Check if we reached a Microsoft login page
             if 'login.microsoftonline.com' not in response.url:
