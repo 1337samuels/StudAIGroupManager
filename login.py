@@ -33,6 +33,89 @@ class AzureADLogin:
         parsed = urlparse(base_url)
         return f"{parsed.scheme}://{parsed.netloc}{url}"
 
+    def extract_approval_number(self, html_content):
+        """Extract the approval number for Microsoft Authenticator"""
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Look for the displaySign div that contains the number
+        display_sign = soup.find('div', {'id': 'idRichContext_DisplaySign'})
+        if display_sign:
+            number = display_sign.get_text(strip=True)
+            return number
+
+        # Fallback: look for any element with class displaySign
+        display_sign = soup.find('div', class_='displaySign')
+        if display_sign:
+            number = display_sign.get_text(strip=True)
+            return number
+
+        return None
+
+    def wait_for_auth_approval(self, response, timeout=300):
+        """Wait for user to approve on Microsoft Authenticator"""
+        import time
+
+        print("\n" + "="*60)
+        print("🔐 MICROSOFT AUTHENTICATOR REQUIRED")
+        print("="*60)
+
+        # Extract the approval number
+        approval_number = self.extract_approval_number(response.text)
+        if approval_number:
+            print(f"\n📱 Please open Microsoft Authenticator on your phone")
+            print(f"   and enter this number: {approval_number}")
+            print(f"\n   >> {approval_number} <<\n")
+        else:
+            print(f"\n📱 Please approve the login request on your phone\n")
+
+        # Get polling URL from config
+        config = self.extract_config_from_script(response.text)
+        if not config:
+            print("Warning: Could not extract config for polling")
+            input("Press Enter after approving on your phone...")
+            return response
+
+        # Look for polling/continuation URL
+        poll_url = config.get('urlBeginAuth') or config.get('urlEndAuth') or config.get('urlPost')
+        if poll_url:
+            poll_url = self.make_absolute_url(poll_url, response.url)
+
+        if not poll_url:
+            print("Warning: Could not determine polling URL")
+            input("Press Enter after approving on your phone...")
+            return response
+
+        # Build form data for polling
+        form_data = self.build_form_data_from_config(config)
+
+        print(f"⏳ Waiting for approval (timeout: {timeout}s)...")
+        start_time = time.time()
+        poll_interval = 3  # Poll every 3 seconds
+
+        while (time.time() - start_time) < timeout:
+            time.sleep(poll_interval)
+
+            try:
+                # Poll the server
+                poll_response = self.session.post(poll_url, data=form_data, allow_redirects=True)
+
+                # Check if we've moved past the auth page
+                if 'Authenticator' not in poll_response.text and \
+                   'displaySign' not in poll_response.text and \
+                   poll_response.url != response.url:
+                    print("✓ Authentication approved!")
+                    return poll_response
+
+                print(".", end="", flush=True)
+
+            except Exception as e:
+                print(f"\nPolling error: {e}")
+                break
+
+        print(f"\n⚠ Timeout waiting for approval")
+        print("Continuing anyway - you may need to approve manually...")
+        return response
+
     def extract_config_from_script(self, html_content):
         """Extract configuration data from JavaScript in the page"""
         soup = BeautifulSoup(html_content, 'html.parser')
@@ -242,6 +325,11 @@ class AzureADLogin:
                 return None
 
             print(f"  Response URL: {response.url}")
+
+            # Step 3.5: Handle Microsoft Authenticator if required
+            if 'Authenticator' in response.text and 'displaySign' in response.text:
+                print("\n[3.5/4] Microsoft Authenticator required...")
+                response = self.wait_for_auth_approval(response)
 
             # Step 4: Handle "Stay signed in?" prompt if present
             print("[4/4] Completing login flow...")
