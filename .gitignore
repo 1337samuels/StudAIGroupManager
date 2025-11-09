@@ -14,6 +14,7 @@ all_assignments.json
 upcoming_assignments.json
 groups_info.json
 study_groups.json
+study_group_report.md
 *.html
 
 # Python

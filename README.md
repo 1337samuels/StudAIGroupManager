@@ -8,12 +8,35 @@ This project provides Python scripts to automate interactions with the LBS learn
 
 ## Features
 
+### 🎯 **Master Script: Study Group Manager** (`study_group_manager.py`)
+**Complete automated workflow** - Run this for the full experience!
+
+1. **Smart Login** - Attempts to restore session from cookies, falls back to manual login if needed
+2. **Extract Upcoming Assignments** - Analyzes dashboard for assignments/events due in next 7 days
+3. **Find Study Group Members** - Navigates to study group and extracts member names
+4. **Member Details** - Extracts background info from Class List (placeholder for now)
+5. **Generate LLM Report** - Creates markdown file optimized for LLM analysis with:
+   - All upcoming assignments with details
+   - Study group member list with backgrounds
+   - Prompt for LLM to suggest task allocation based on member strengths
+
+**Usage:**
+```bash
+python study_group_manager.py
+```
+
+**Output:** `study_group_report.md` - Ready to upload to any LLM for task planning recommendations
+
+---
+
+### Individual Scripts
+
 ### 1. Automated Login (`login.py`)
 - Opens Chrome browser with Selenium
-- Navigates to https://learning.london.edu
-- Waits for manual Microsoft login + MFA completion
+- **NEW:** Attempts to restore session from saved cookies
+- Waits for manual Microsoft login + MFA completion (if cookies invalid)
 - Detects successful authentication automatically
-- Saves session cookies for potential reuse
+- Saves session cookies for reuse
 
 ### 2. Dashboard Analysis (`analyze_dashboard.py`)
 - Parses the LBS dashboard HTML

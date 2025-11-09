@@ -159,6 +159,46 @@ class AzureADLogin:
             print(f"✗ Error saving session: {e}")
             return False
 
+    def load_and_restore_cookies(self, filename='session.json'):
+        """Load cookies from file and restore them to the browser"""
+        try:
+            with open(filename, 'r') as f:
+                self.cookies = json.load(f)
+
+            if not self.driver:
+                return False
+
+            # Navigate to the domain first (cookies need a domain context)
+            self.driver.get("https://learning.london.edu")
+            time.sleep(1)
+
+            # Add each cookie to the browser
+            for name, cookie_data in self.cookies.items():
+                cookie = {
+                    'name': name,
+                    'value': cookie_data['value'],
+                    'domain': cookie_data.get('domain', '.learning.london.edu'),
+                    'path': cookie_data.get('path', '/'),
+                }
+                if 'secure' in cookie_data:
+                    cookie['secure'] = cookie_data['secure']
+
+                try:
+                    self.driver.add_cookie(cookie)
+                except Exception as e:
+                    # Some cookies might fail, that's okay
+                    pass
+
+            print(f"✓ Loaded and restored cookies from {filename}")
+            return True
+
+        except FileNotFoundError:
+            print(f"  No session file found at {filename}")
+            return False
+        except Exception as e:
+            print(f"  Error loading session: {e}")
+            return False
+
     def get_page_source(self):
         """Get the current page HTML source"""
         try:
