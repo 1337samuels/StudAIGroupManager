@@ -9,6 +9,13 @@ mfa_page.html
 process_auth_response.html
 bsso_resubmit_response.html
 
+# Analysis output files
+all_assignments.json
+upcoming_assignments.json
+groups_info.json
+study_groups.json
+*.html
+
 # Python
 __pycache__/
 *.py[cod]
