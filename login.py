@@ -478,6 +478,30 @@ class AzureADLogin:
                             f.write(response.text)
                         print(f"  Saved ProcessAuth response to process_auth_response.html")
 
+                        # Check if we got a BssoInterrupt page (SSO broker redirect)
+                        if 'BssoInterrupt' in response.text:
+                            print("  Detected BssoInterrupt page - resubmitting with oPostParams...")
+                            bsso_config = self.extract_config_from_script(response.text)
+                            if bsso_config and 'oPostParams' in bsso_config and 'urlPost' in bsso_config:
+                                # Use the oPostParams directly (they already include AuthMethodId)
+                                resubmit_data = bsso_config['oPostParams']
+                                resubmit_url = bsso_config['urlPost']
+                                resubmit_url = self.make_absolute_url(resubmit_url, response.url)
+
+                                print(f"  Resubmitting to: {resubmit_url}")
+                                print(f"  Resubmit data keys: {list(resubmit_data.keys())}")
+
+                                response = self.session.post(resubmit_url, data=resubmit_data, allow_redirects=True)
+                                print(f"  Resubmit response status: {response.status_code}")
+                                print(f"  Resubmit response URL: {response.url}")
+
+                                # Save resubmit response
+                                with open('bsso_resubmit_response.html', 'w', encoding='utf-8') as f:
+                                    f.write(response.text)
+                                print(f"  Saved resubmit response to bsso_resubmit_response.html")
+                            else:
+                                print("  Warning: Could not extract oPostParams from BssoInterrupt page")
+
                     # Fallback: try BeginAuth if urlPost doesn't work or doesn't exist
                     elif 'urlBeginAuth' in config:
                         print(f"  Using urlBeginAuth to initiate authentication")
