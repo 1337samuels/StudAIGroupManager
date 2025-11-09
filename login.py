@@ -111,9 +111,8 @@ class AzureADLogin:
             return response
 
         # Build form data for polling (use MFA-specific form data)
+        # NOTE: Don't send Method='EndAuth' - the endpoint itself IS EndAuth!
         form_data = self.build_form_data_from_config(config, for_mfa=True)
-        # Add polling parameters
-        form_data['Method'] = 'EndAuth'
         form_data['AuthMethodId'] = 'PhoneAppNotification'
 
         print(f"⏳ Waiting for approval (timeout: {timeout}s)...")
@@ -539,13 +538,14 @@ class AzureADLogin:
                         config = self.extract_config_from_script(response.text)
                         if config and 'urlBeginAuth' in config:
                             # Build form data and call BeginAuth
+                            # NOTE: Don't send Method='BeginAuth' - the endpoint itself IS BeginAuth!
                             form_data = self.build_form_data_from_config(config, for_mfa=True)
-                            form_data['Method'] = 'BeginAuth'
                             form_data['AuthMethodId'] = 'PhoneAppNotification'
 
                             begin_url = config['urlBeginAuth']
                             begin_url = self.make_absolute_url(begin_url, response.url)
                             print(f"  Calling BeginAuth at: {begin_url}")
+                            print(f"  Form data keys: {list(form_data.keys())}")
 
                             response = self.session.post(begin_url, data=form_data, allow_redirects=True)
                             print(f"  BeginAuth response status: {response.status_code}")
