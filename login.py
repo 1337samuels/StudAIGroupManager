@@ -21,6 +21,18 @@ class AzureADLogin:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         })
 
+    def make_absolute_url(self, url, base_url):
+        """Convert relative URL to absolute URL"""
+        if not url:
+            return url
+
+        if url.startswith('http://') or url.startswith('https://'):
+            return url
+
+        # Relative URL - construct absolute
+        parsed = urlparse(base_url)
+        return f"{parsed.scheme}://{parsed.netloc}{url}"
+
     def extract_config_from_script(self, html_content):
         """Extract configuration data from JavaScript in the page"""
         soup = BeautifulSoup(html_content, 'html.parser')
@@ -47,6 +59,21 @@ class AzureADLogin:
         """Build form data from the $Config object"""
         form_data = {}
 
+        # Prefer using oPostParams if available (pre-filled by server)
+        if 'oPostParams' in config:
+            form_data = config['oPostParams'].copy()
+            print(f"  Using oPostParams with {len(form_data)} fields")
+
+            # Override username and password if provided
+            if username:
+                form_data['login'] = username
+                form_data['loginfmt'] = username
+            if password:
+                form_data['passwd'] = password
+
+            return form_data
+
+        # Fallback: build form data manually from config fields
         # Essential fields from config
         if 'sFT' in config:
             ft_name = config.get('sFTName', 'flowToken')
@@ -162,6 +189,8 @@ class AzureADLogin:
                 form_data = self.build_form_data_from_config(config, username=self.username)
                 # Get action URL from config
                 action_url = config.get('urlPost') or config.get('urlPostAad')
+                # Make URL absolute if needed
+                action_url = self.make_absolute_url(action_url, response.url)
 
             if not action_url:
                 print("Error: Could not determine post URL")
@@ -196,6 +225,8 @@ class AzureADLogin:
                 form_data = self.build_form_data_from_config(config, username=self.username, password=self.password)
                 # Get action URL from config
                 action_url = config.get('urlPost') or config.get('urlPostAad')
+                # Make URL absolute if needed
+                action_url = self.make_absolute_url(action_url, response.url)
 
             if not action_url:
                 print("Error: Could not determine post URL for password")
@@ -224,6 +255,8 @@ class AzureADLogin:
                     form_data = self.build_form_data_from_config(config)
                     form_data['LoginOptions'] = '1'  # Don't stay signed in
                     action_url = config.get('urlPost')
+                    # Make URL absolute if needed
+                    action_url = self.make_absolute_url(action_url, response.url)
                 else:
                     form_data, action_url = self.extract_form_data(response.text)
                     if form_data:
