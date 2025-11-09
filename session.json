@@ -1,0 +1,50 @@
+{
+  "_ga_M4Z4BYDZ4D": {
+    "value": "GS2.2.s1762727437$o1$g0$t1762727437$j60$l0$h0",
+    "domain": ".london.edu",
+    "path": "/",
+    "secure": false
+  },
+  "_csrf_token": {
+    "value": "pqRMEVGdRwWh27LNN1ituaubVtASOmuGL7YMAZJqB9Dg7Sp5Yfp%2FT8m36J50H8Dpm64DmHZoPdJL5T1Vxx9Qhg%3D%3D",
+    "domain": "learning.london.edu",
+    "path": "/",
+    "secure": true
+  },
+  "dpUseLegacy": {
+    "value": "true",
+    "domain": "learning.london.edu",
+    "path": "/",
+    "secure": false
+  },
+  "_gat": {
+    "value": "1",
+    "domain": ".london.edu",
+    "path": "/",
+    "secure": false
+  },
+  "_ga": {
+    "value": "GA1.2.412986451.1762727428",
+    "domain": ".london.edu",
+    "path": "/",
+    "secure": false
+  },
+  "canvas_session": {
+    "value": "rfqIU7PI1a5y-75vWILbUg+bn0Te9UywPphzEQRFI7aTHgjL0OhevTF17xT11BrFxOSq06drAMxgThQDU9XjsfgP7irJS_JFx6YK2puXJJT0ZQQR6bD-DOE7vGe5Jew2YIFwB3bxPDQSSMr2qNCFQWYl58leeGyzkaZFBncw1G5Vuy18mVXZo8iHZJS6SnDGNjaIq_b7Lmuyy-38_M1Y_zrsYAnMKdwL14XFgsLp3dFj8PrKAxc7gzyx1eVWgRBESMQ6TwsxJVaYu8N6LMvttB5RgmkTkey_RYepRwtmuxRd_HIiIHYQjOn-wPtKb3Q0UtpmrmfqDwOhmToFO0yhyvjIqMrXAT6eAO-9Bf0ZLPYPBpskEzEDg0tEDYXMcVOIV-qFwz7kBeXtsF1Kaq7sWmF6OKjQ39HJJZxOKjRIQA4l4h10V89whjlZpbGqcgi5dBU7Cv3iosc7Fo_DxoWfB7ptcOIV3JZxZSvqKtP5e_IZTaIpQCHws6BcPew_um_IPAhCesi2DEJaMc7seOwhgbi9g8O0Ej_w_gvE3B1NVJnTBLwt50x1PSSzREeMN_8BB1F_2dOGjKreR8VzrMiXQLg.zSTvwiO1PIqKmaMmF-J8Oy2708A.aREV8A",
+    "domain": "learning.london.edu",
+    "path": "/",
+    "secure": true
+  },
+  "_gid": {
+    "value": "GA1.2.928194578.1762727428",
+    "domain": ".london.edu",
+    "path": "/",
+    "secure": false
+  },
+  "log_session_id": {
+    "value": "9b928b309f5a1a57440f86f3791c028a",
+    "domain": "learning.london.edu",
+    "path": "/",
+    "secure": true
+  }
+}
