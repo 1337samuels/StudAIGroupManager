@@ -100,8 +100,8 @@ class AzureADLogin:
             input("Press Enter after approving on your phone...")
             return response
 
-        # Look for polling/continuation URL
-        poll_url = config.get('urlBeginAuth') or config.get('urlEndAuth') or config.get('urlPost')
+        # Look for polling/continuation URL (prefer EndAuth for polling after BeginAuth)
+        poll_url = config.get('urlEndAuth') or config.get('urlPost') or config.get('urlBeginAuth')
         if poll_url:
             poll_url = self.make_absolute_url(poll_url, response.url)
 
@@ -112,6 +112,9 @@ class AzureADLogin:
 
         # Build form data for polling
         form_data = self.build_form_data_from_config(config)
+        # Add polling parameters
+        form_data['Method'] = 'EndAuth'
+        form_data['AuthMethodId'] = 'PhoneAppNotification'
 
         print(f"⏳ Waiting for approval (timeout: {timeout}s)...")
         start_time = time.time()
@@ -434,8 +437,29 @@ class AzureADLogin:
                     begin_url = config['urlBeginAuth']
                     begin_url = self.make_absolute_url(begin_url, response.url)
 
-                    response = self.session.post(begin_url, data=form_data, allow_redirects=True)
-                    print(f"  Auth initiated, response URL: {response.url}")
+                    begin_response = self.session.post(begin_url, data=form_data, allow_redirects=True)
+                    print(f"  Auth initiated, response URL: {begin_response.url}")
+
+                    # Save BeginAuth response for debugging
+                    with open('begin_auth_response.html', 'w', encoding='utf-8') as f:
+                        f.write(begin_response.text)
+                    print(f"  Saved BeginAuth response to begin_auth_response.html")
+
+                    # Now poll once to get the page with the approval number
+                    print("  Fetching approval number...")
+                    poll_url = config.get('urlEndAuth') or config.get('urlPost')
+                    if poll_url:
+                        poll_url = self.make_absolute_url(poll_url, response.url)
+                        form_data = self.build_form_data_from_config(config)
+                        # Add polling method
+                        form_data['Method'] = 'EndAuth'
+                        form_data['AuthMethodId'] = 'PhoneAppNotification'
+
+                        response = self.session.post(poll_url, data=form_data, allow_redirects=True)
+                        print(f"  Poll response URL: {response.url}")
+                    else:
+                        print("  Warning: Could not determine polling URL after BeginAuth")
+                        response = begin_response
 
                 # Now wait for approval
                 response = self.wait_for_auth_approval(response)
