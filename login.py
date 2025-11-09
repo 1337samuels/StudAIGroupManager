@@ -110,8 +110,8 @@ class AzureADLogin:
             input("Press Enter after approving on your phone...")
             return response
 
-        # Build form data for polling
-        form_data = self.build_form_data_from_config(config)
+        # Build form data for polling (use MFA-specific form data)
+        form_data = self.build_form_data_from_config(config, for_mfa=True)
         # Add polling parameters
         form_data['Method'] = 'EndAuth'
         form_data['AuthMethodId'] = 'PhoneAppNotification'
@@ -166,9 +166,30 @@ class AzureADLogin:
 
         return config
 
-    def build_form_data_from_config(self, config, username=None, password=None):
+    def build_form_data_from_config(self, config, username=None, password=None, for_mfa=False):
         """Build form data from the $Config object"""
         form_data = {}
+
+        # For MFA requests, don't use oPostParams - build clean form with only MFA fields
+        if for_mfa:
+            print(f"  Building clean MFA form data (not using oPostParams)")
+            # Essential MFA fields only
+            if 'sFT' in config:
+                ft_name = config.get('sFTName', 'flowToken')
+                form_data[ft_name] = config['sFT']
+
+            if 'sCtx' in config:
+                form_data['ctx'] = config['sCtx']
+
+            if 'canary' in config:
+                form_data['canary'] = config['canary']
+            elif 'apiCanary' in config:
+                form_data['canary'] = config['apiCanary']
+
+            if 'hpgrequestid' in config or 'sessionId' in config:
+                form_data['hpgrequestid'] = config.get('hpgrequestid', config.get('sessionId', ''))
+
+            return form_data
 
         # Prefer using oPostParams if available (pre-filled by server)
         if 'oPostParams' in config:
@@ -429,8 +450,8 @@ class AzureADLogin:
                 if config and 'urlBeginAuth' in config:
                     print("  Initiating authentication request...")
 
-                    # Build form data and call BeginAuth
-                    form_data = self.build_form_data_from_config(config)
+                    # Build form data and call BeginAuth (use MFA-specific form data)
+                    form_data = self.build_form_data_from_config(config, for_mfa=True)
                     form_data['AuthMethodId'] = 'PhoneAppNotification'
                     form_data['Method'] = 'BeginAuth'
 
@@ -450,7 +471,7 @@ class AzureADLogin:
                     poll_url = config.get('urlEndAuth') or config.get('urlPost')
                     if poll_url:
                         poll_url = self.make_absolute_url(poll_url, response.url)
-                        form_data = self.build_form_data_from_config(config)
+                        form_data = self.build_form_data_from_config(config, for_mfa=True)
                         # Add polling method
                         form_data['Method'] = 'EndAuth'
                         form_data['AuthMethodId'] = 'PhoneAppNotification'
