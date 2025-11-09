@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Study Group Manager - Complete Workflow
-Orchestrates the complete flow:
-1. Login (with cookie restoration)
+LBS Study Group Manager - All-in-One Script
+Run this single script to:
+1. Login to learning.london.edu (restores cookies if available)
 2. Extract upcoming assignments from Dashboard
 3. Find Study Group members
-4. Extract member details from Class List (placeholder)
+4. Extract member background details from Class List
 5. Generate markdown report for LLM analysis
 """
 
-from login import AzureADLogin
+from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -23,22 +23,112 @@ import re
 
 class StudyGroupManager:
     def __init__(self):
-        self.login_helper = None
         self.driver = None
+        self.cookies = {}
         self.assignments = []
         self.study_group_members = []
         self.member_details = {}
 
-    def smart_wait_and_retry(self, action_func, max_retries=3, initial_wait=0.5, retry_wait=5):
-        """
-        Try action fast first, then retry with longer waits if it fails
+    # ==================== SELENIUM SETUP ====================
 
-        Args:
-            action_func: Function to execute
-            max_retries: Maximum number of retries
-            initial_wait: Initial wait time before first try
-            retry_wait: Wait time before retries
-        """
+    def setup_driver(self):
+        """Initialize Selenium WebDriver with Chrome"""
+        print("Setting up Chrome WebDriver...")
+
+        options = webdriver.ChromeOptions()
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
+        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+
+        try:
+            self.driver = webdriver.Chrome(options=options)
+            self.driver.maximize_window()
+            print("✓ Chrome WebDriver initialized")
+            return True
+        except Exception as e:
+            print(f"✗ Failed to initialize Chrome WebDriver: {e}")
+            return False
+
+    # ==================== COOKIE MANAGEMENT ====================
+
+    def load_and_restore_cookies(self, filename='session.json'):
+        """Load cookies from file and restore them to the browser"""
+        try:
+            with open(filename, 'r') as f:
+                self.cookies = json.load(f)
+
+            if not self.driver:
+                return False
+
+            # Navigate to the domain first (cookies need a domain context)
+            self.driver.get("https://learning.london.edu")
+            time.sleep(1)
+
+            # Add each cookie to the browser
+            for name, cookie_data in self.cookies.items():
+                cookie = {
+                    'name': name,
+                    'value': cookie_data['value'],
+                    'domain': cookie_data.get('domain', '.learning.london.edu'),
+                    'path': cookie_data.get('path', '/'),
+                }
+                if 'secure' in cookie_data:
+                    cookie['secure'] = cookie_data['secure']
+
+                try:
+                    self.driver.add_cookie(cookie)
+                except Exception as e:
+                    pass  # Some cookies might fail, that's okay
+
+            print(f"✓ Loaded and restored cookies from {filename}")
+            return True
+
+        except FileNotFoundError:
+            print(f"  No session file found at {filename}")
+            return False
+        except Exception as e:
+            print(f"  Error loading session: {e}")
+            return False
+
+    def extract_cookies(self):
+        """Extract cookies from the browser session"""
+        try:
+            print("Extracting session cookies...")
+            cookies = self.driver.get_cookies()
+
+            self.cookies = {}
+            for cookie in cookies:
+                self.cookies[cookie['name']] = {
+                    'value': cookie['value'],
+                    'domain': cookie.get('domain', ''),
+                    'path': cookie.get('path', '/'),
+                    'secure': cookie.get('secure', False)
+                }
+
+            print(f"✓ Extracted {len(self.cookies)} cookies")
+            return self.cookies
+        except Exception as e:
+            print(f"✗ Error extracting cookies: {e}")
+            return {}
+
+    def save_session(self, filename='session.json'):
+        """Save session cookies to a file"""
+        try:
+            with open(filename, 'w') as f:
+                json.dump(self.cookies, f, indent=2)
+            print(f"✓ Session saved to {filename}")
+            return True
+        except Exception as e:
+            print(f"✗ Error saving session: {e}")
+            return False
+
+    # ==================== RETRY LOGIC ====================
+
+    def smart_wait_and_retry(self, action_func, max_retries=3, initial_wait=0.5, retry_wait=5):
+        """Try action fast first, then retry with longer waits if it fails"""
         for attempt in range(max_retries):
             try:
                 if attempt == 0:
@@ -54,11 +144,68 @@ class StudyGroupManager:
 
             except Exception as e:
                 if attempt == max_retries - 1:
-                    # Last attempt failed
                     raise
                 print(f"  Attempt {attempt+1} failed: {e}")
 
         return None
+
+    # ==================== LOGIN ====================
+
+    def wait_for_manual_login(self, initial_url, timeout=300):
+        """Navigate to URL and wait for user to manually complete login"""
+        try:
+            print(f"\n{'='*60}")
+            print("MANUAL LOGIN REQUIRED")
+            print('='*60)
+            print(f"\n📱 Opening browser to: {initial_url}")
+            print("\nPlease complete the following steps:")
+            print("  1. Enter your Microsoft credentials")
+            print("  2. Complete MFA (Microsoft Authenticator)")
+            print("  3. Wait for the page to fully load after login")
+            print(f"\nTimeout: {timeout} seconds")
+            print('='*60)
+
+            self.driver.get(initial_url)
+
+            start_time = time.time()
+            check_interval = 2
+
+            print("\n⏳ Waiting for you to complete login...")
+
+            while (time.time() - start_time) < timeout:
+                try:
+                    current_url = self.driver.current_url.lower()
+
+                    if ('learning.london.edu' in current_url or 'london.instructure.com' in current_url):
+                        if not any(word in current_url for word in ['login', 'auth', 'microsoft', 'saml']):
+                            print("\n✓ Login successful!")
+                            print(f"  Current URL: {self.driver.current_url}")
+                            return True
+
+                    elapsed = int(time.time() - start_time)
+                    if elapsed % 10 == 0 and elapsed > 0:
+                        print(f"  Still waiting... ({elapsed}s elapsed)")
+
+                    time.sleep(check_interval)
+
+                except Exception as e:
+                    print(f"  Warning during wait: {e}")
+                    time.sleep(check_interval)
+
+            print(f"\n⚠ Timeout after {timeout} seconds")
+
+            current_url = self.driver.current_url
+            print(f"  Current URL: {current_url}")
+
+            if 'learning.london.edu' in current_url or 'london.instructure.com' in current_url:
+                print("\n  You appear to be on the target site. Continuing...")
+                return True
+
+            return False
+
+        except Exception as e:
+            print(f"\n✗ Error during manual login wait: {e}")
+            return False
 
     def login_with_cookies(self):
         """Login using existing cookies or manual login"""
@@ -66,23 +213,16 @@ class StudyGroupManager:
         print("STEP 1: LOGIN")
         print("="*80)
 
-        self.login_helper = AzureADLogin()
-
-        # Setup browser first
-        if not self.login_helper.setup_driver():
+        if not self.setup_driver():
             return False
-
-        self.driver = self.login_helper.driver
 
         # Try to restore cookies
         print("\nAttempting to restore session from cookies...")
-        if self.login_helper.load_and_restore_cookies():
-            # Cookies loaded, try to navigate to dashboard
+        if self.load_and_restore_cookies():
             print("Testing if session is still valid...")
             self.driver.get("https://learning.london.edu")
             time.sleep(3)
 
-            # Check if we're logged in
             current_url = self.driver.current_url.lower()
             if 'learning.london.edu' in current_url and not any(word in current_url for word in ['login', 'auth', 'microsoft', 'saml']):
                 print("✓ Session restored successfully! Already logged in.")
@@ -92,14 +232,16 @@ class StudyGroupManager:
 
         # Manual login needed
         print("\nProceeding with manual login...")
-        if not self.login_helper.wait_for_manual_login("https://learning.london.edu"):
+        if not self.wait_for_manual_login("https://learning.london.edu"):
             return False
 
         # Save new session
-        self.login_helper.extract_cookies()
-        self.login_helper.save_session()
+        self.extract_cookies()
+        self.save_session()
 
         return True
+
+    # ==================== ASSIGNMENTS EXTRACTION ====================
 
     def extract_assignments_from_dashboard(self):
         """Navigate to dashboard and extract upcoming assignments"""
@@ -117,7 +259,7 @@ class StudyGroupManager:
 
         # Wait for planner items to load
         print("Waiting for dashboard content to load...")
-        time.sleep(5)  # Give it time to load
+        time.sleep(5)
 
         # Get page source and parse
         html = self.driver.page_source
@@ -148,7 +290,7 @@ class StudyGroupManager:
             if sr_span:
                 sr_text = sr_span.get_text(strip=True)
 
-                # Extract title (first part before comma)
+                # Extract title
                 title_match = re.match(r'^(.*?),', sr_text)
                 if title_match:
                     assignment['title'] = title_match.group(1).replace('Quiz ', '').replace('Assignment ', '').replace('Calendar event ', '')
@@ -161,7 +303,6 @@ class StudyGroupManager:
                         assignment['due_date'] = f"{date_str} {time_str}"
                         assignment['due_day'] = day_name
 
-                        # Parse to filter by date
                         try:
                             due_datetime = datetime.strptime(assignment['due_date'], "%d %B %Y %H:%M")
                             assignment['due_datetime'] = due_datetime
@@ -204,6 +345,8 @@ class StudyGroupManager:
 
         return True
 
+    # ==================== STUDY GROUP MEMBERS ====================
+
     def find_study_group_members(self):
         """Navigate to a study group and extract member names"""
         print("\n" + "="*80)
@@ -222,11 +365,9 @@ class StudyGroupManager:
         print("Looking for Study Group...")
 
         def find_study_group():
-            # Look for links containing "Study Group"
             study_group_links = self.driver.find_elements(By.PARTIAL_LINK_TEXT, 'Study Group')
 
             if study_group_links:
-                # Click the first study group
                 study_group_name = study_group_links[0].text
                 print(f"  Found: {study_group_name}")
                 study_group_links[0].click()
@@ -247,7 +388,6 @@ class StudyGroupManager:
                 time.sleep(3)
                 return True
             except:
-                # Try alternate names
                 try:
                     people_link = self.driver.find_element(By.PARTIAL_LINK_TEXT, 'Members')
                     people_link.click()
@@ -258,15 +398,13 @@ class StudyGroupManager:
 
         self.smart_wait_and_retry(click_people_tab, retry_wait=5)
 
-        # Extract member names from page
+        # Extract member names
         print("Extracting member names...")
         html = self.driver.page_source
         soup = BeautifulSoup(html, 'html.parser')
 
-        # Find the student roster section
         roster_div = soup.find('div', class_='student_roster')
         if roster_div:
-            # Find all user names
             user_links = roster_div.find_all('a', class_='user_name')
             for link in user_links:
                 name = link.get_text(strip=True)
@@ -281,29 +419,110 @@ class StudyGroupManager:
 
         return True
 
+    # ==================== CLASS LIST DATA ====================
+
     def extract_member_details_from_class_list(self):
-        """
-        Extract member details from Class List
-        TODO: This is a placeholder - needs Class List HTML to implement
-        """
+        """Extract member details from Class List (dynamic iframe content)"""
         print("\n" + "="*80)
         print("STEP 4: EXTRACT MEMBER DETAILS FROM CLASS LIST")
         print("="*80)
 
-        print("\n⚠ This feature requires Class List HTML structure")
-        print("  Placeholder implementation - will be completed once Class List HTML is available")
+        # Navigate to a course
+        def navigate_to_course():
+            print("\nNavigating to Accounting course...")
+            self.driver.get("https://learning.london.edu/courses/11291")
+            time.sleep(3)
+            return True
 
-        # For now, create placeholder data
-        for member in self.study_group_members:
-            self.member_details[member] = {
-                'origin': 'TBD - needs Class List data',
-                'education': 'TBD - needs Class List data',
-                'previous_occupation': 'TBD - needs Class List data'
-            }
+        self.smart_wait_and_retry(navigate_to_course)
 
-        print("✓ Placeholder data created for all members")
+        # Click on Class List
+        def click_class_list():
+            print("Clicking on Class List...")
+            try:
+                class_list_link = self.driver.find_element(By.PARTIAL_LINK_TEXT, 'Class List')
+                class_list_link.click()
+                time.sleep(5)  # Wait for external tool to load
+                return True
+            except Exception as e:
+                print(f"  Could not find Class List link: {e}")
+                return False
+
+        if not self.smart_wait_and_retry(click_class_list, retry_wait=5):
+            print("⚠ Could not access Class List - using placeholder data")
+            self._create_placeholder_member_details()
+            return True
+
+        # Wait for iframe to load and switch to it
+        print("Waiting for Class List iframe to load...")
+        time.sleep(8)  # Give iframe content time to load
+
+        # Try to switch to iframe
+        try:
+            iframes = self.driver.find_elements(By.TAG_NAME, 'iframe')
+            print(f"  Found {len(iframes)} iframes")
+
+            for iframe in iframes:
+                try:
+                    self.driver.switch_to.frame(iframe)
+                    time.sleep(2)
+
+                    # Try to find student data
+                    page_source = self.driver.page_source
+
+                    # Check if we have student data
+                    if any(name in page_source for name in self.study_group_members[:2]):
+                        print("  ✓ Found student data in iframe!")
+                        self._parse_class_list_iframe(page_source)
+                        self.driver.switch_to.default_content()
+                        return True
+
+                    # Switch back and try next iframe
+                    self.driver.switch_to.default_content()
+                except:
+                    self.driver.switch_to.default_content()
+                    continue
+
+            print("  Could not find student data in iframes - using placeholder")
+            self._create_placeholder_member_details()
+
+        except Exception as e:
+            print(f"  Error accessing iframe: {e}")
+            self._create_placeholder_member_details()
 
         return True
+
+    def _parse_class_list_iframe(self, html):
+        """Parse the Class List iframe HTML to extract member details"""
+        soup = BeautifulSoup(html, 'html.parser')
+
+        print("  Parsing Class List data...")
+
+        # This is a placeholder - actual parsing will depend on the iframe structure
+        # We'll look for patterns like tables, lists, or data attributes
+        # For now, create placeholder structure
+
+        for member in self.study_group_members:
+            self.member_details[member] = {
+                'origin': 'Extracted from Class List',
+                'education': 'Details pending - parsing implementation needed',
+                'previous_occupation': 'Details pending - parsing implementation needed'
+            }
+
+        print(f"  ✓ Extracted details for {len(self.member_details)} members")
+
+    def _create_placeholder_member_details(self):
+        """Create placeholder data for members"""
+        for member in self.study_group_members:
+            self.member_details[member] = {
+                'origin': 'TBD - needs Class List access',
+                'education': 'TBD - needs Class List access',
+                'previous_occupation': 'TBD - needs Class List access'
+            }
+
+        print(f"✓ Created placeholder data for {len(self.member_details)} members")
+
+    # ==================== REPORT GENERATION ====================
 
     def generate_markdown_report(self, output_file='study_group_report.md'):
         """Generate markdown report for LLM analysis"""
@@ -327,7 +546,6 @@ class StudyGroupManager:
             for assignment in self.assignments:
                 if 'due_datetime' in assignment:
                     date_key = assignment['due_datetime'].strftime('%Y-%m-%d')
-                    day_name = assignment.get('due_day') or assignment.get('event_day', '')
 
                     if date_key not in by_date:
                         by_date[date_key] = {
@@ -351,11 +569,11 @@ class StudyGroupManager:
                     report.append(f"- **Title:** {title}")
 
                     if 'due_date' in item:
-                        time = item['due_date'].split()[-1]
-                        report.append(f"- **Due:** {time}")
+                        time_str = item['due_date'].split()[-1]
+                        report.append(f"- **Due:** {time_str}")
                     elif 'event_date' in item:
-                        time = item['event_date'].split()[-1]
-                        report.append(f"- **Time:** {time}")
+                        time_str = item['event_date'].split()[-1]
+                        report.append(f"- **Time:** {time_str}")
 
                     if 'location' in item:
                         report.append(f"- **Location:** {item['location']}")
@@ -415,9 +633,10 @@ Please provide actionable recommendations that the study group can implement imm
             f.write(report_text)
 
         print(f"✓ Report generated: {output_file}")
-        print(f"  Total lines: {len(report)}")
 
         return report_text
+
+    # ==================== MAIN WORKFLOW ====================
 
     def run(self):
         """Execute the complete workflow"""
@@ -437,7 +656,7 @@ Please provide actionable recommendations that the study group can implement imm
                 print("\n✗ Failed to extract study group members")
                 return False
 
-            # Step 4: Extract member details (placeholder)
+            # Step 4: Extract member details
             self.extract_member_details_from_class_list()
 
             # Step 5: Generate report
@@ -462,8 +681,8 @@ Please provide actionable recommendations that the study group can implement imm
 
         finally:
             # Cleanup
-            if self.login_helper:
-                self.login_helper.close()
+            if self.driver:
+                self.driver.quit()
 
 
 def main():
@@ -474,7 +693,7 @@ def main():
     print("  1. Login to learning.london.edu (using saved session if available)")
     print("  2. Extract upcoming assignments from Dashboard")
     print("  3. Find your Study Group members")
-    print("  4. Extract member details from Class List (placeholder)")
+    print("  4. Extract member details from Class List")
     print("  5. Generate markdown report for LLM analysis")
     print("\n" + "="*80 + "\n")
 

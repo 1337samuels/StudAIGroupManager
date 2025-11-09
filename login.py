@@ -257,71 +257,7 @@ class AzureADLogin:
             print("\n[2/3] Extracting session data...")
             self.extract_cookies()
 
-            # Save session
-            print("\n[3/3] Saving session...")
-            self.save_session()
-
-            print("\n" + "="*60)
-            print("✓ LOGIN COMPLETE")
-            print("="*60)
-            print(f"  Current URL: {self.driver.current_url}")
-            print(f"  Cookies saved: {len(self.cookies)}")
-            print("\n  The browser will remain open for scraping.")
-            print("  You can now use self.driver to interact with the page.")
-            print("="*60)
-
-            return self.driver
-
-        except Exception as e:
-            print(f"\n✗ Error during login: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return None
-
-    def close(self):
-        """Close the browser"""
-        if self.driver:
-            print("\nClosing browser...")
-            self.driver.quit()
-            print("✓ Browser closed")
-
-    def __enter__(self):
-        """Context manager entry"""
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit"""
-        self.close()
-
-
-def main():
-    """Main entry point"""
-    print("="*60)
-    print("London Business School - Learning Portal Login")
-    print("="*60)
-
-    # Create login instance using context manager
-    with AzureADLogin() as login:
-        # Attempt login
-        driver = login.login()
-
-        if driver:
-            print("\n✓ You can now use the 'driver' object to interact with the page")
-            print("\nExample - Get page source:")
-            print("  page_html = login.get_page_source()")
-            print("\nExample - Find an element:")
-            print("  element = login.find_element(By.ID, 'some-id')")
-            print("\nExample - Navigate to another page:")
-            print("  login.navigate('https://learning.london.edu/courses')")
-
-            # Keep the browser open for manual inspection/debugging
-            input("\n\nPress Enter to close the browser and exit...")
-
-            return driver
-        else:
-            print("\n✗ Login failed")
-            sys.exit(1)
-
-
+# This file is a utility module - run run.py instead
 if __name__ == '__main__':
-    main()
+    print("This is a utility module.")
+    print("Please run: python run.py")

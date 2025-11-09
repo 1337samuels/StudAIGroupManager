@@ -211,5 +211,8 @@ def main():
         print(f"  {course_name}: {count}")
 
 
+
+# This file is a utility module - run run.py instead
 if __name__ == '__main__':
-    main()
+    print("This is a utility module.")
+    print("Please run: python run.py")
