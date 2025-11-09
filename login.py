@@ -21,8 +21,78 @@ class AzureADLogin:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         })
 
+    def extract_config_from_script(self, html_content):
+        """Extract configuration data from JavaScript in the page"""
+        soup = BeautifulSoup(html_content, 'html.parser')
+        config = {}
+
+        # Try to find the $Config object
+        scripts = soup.find_all('script')
+        for script in scripts:
+            if script.string and '$Config=' in script.string:
+                # Extract JSON-like config
+                match = re.search(r'\$Config\s*=\s*({.*?});', script.string, re.DOTALL)
+                if match:
+                    try:
+                        config_str = match.group(1)
+                        # Handle escaped characters
+                        config = json.loads(config_str)
+                    except Exception as e:
+                        print(f"  Warning: Could not parse $Config: {e}")
+                        pass
+
+        return config
+
+    def build_form_data_from_config(self, config, username=None, password=None):
+        """Build form data from the $Config object"""
+        form_data = {}
+
+        # Essential fields from config
+        if 'sFT' in config:
+            ft_name = config.get('sFTName', 'flowToken')
+            form_data[ft_name] = config['sFT']
+
+        if 'sCtx' in config:
+            form_data['ctx'] = config['sCtx']
+
+        if 'canary' in config:
+            form_data['canary'] = config['canary']
+        elif 'apiCanary' in config:
+            form_data['canary'] = config['apiCanary']
+
+        if 'hpgrequestid' in config or 'sessionId' in config:
+            form_data['hpgrequestid'] = config.get('hpgrequestid', config.get('sessionId', ''))
+
+        # Additional common fields
+        form_data['i13'] = '0'
+        form_data['login'] = username if username else ''
+        form_data['loginfmt'] = username if username else ''
+        form_data['type'] = '11'
+        form_data['LoginOptions'] = '3'
+        form_data['lrt'] = ''
+        form_data['lrtPartition'] = ''
+        form_data['hisRegion'] = ''
+        form_data['hisScaleUnit'] = ''
+        form_data['passwd'] = password if password else ''
+        form_data['ps'] = '2'
+        form_data['psRNGCDefaultType'] = ''
+        form_data['psRNGCEntropy'] = ''
+        form_data['psRNGCSLK'] = ''
+        form_data['PPSX'] = ''
+        form_data['NewUser'] = '1'
+        form_data['FoundMSAs'] = ''
+        form_data['fspost'] = '0'
+        form_data['i21'] = '0'
+        form_data['CookieDisclosure'] = '0'
+        form_data['IsFidoSupported'] = '1'
+        form_data['isSignupPost'] = '0'
+        form_data['isRecoveryAttemptPost'] = '0'
+        form_data['i19'] = '1234'  # Some random number
+
+        return form_data
+
     def extract_form_data(self, html_content, form_id=None):
-        """Extract all hidden input fields from the form"""
+        """Extract all hidden input fields from the form (fallback method)"""
         soup = BeautifulSoup(html_content, 'html.parser')
 
         if form_id:
@@ -47,25 +117,6 @@ class AzureADLogin:
 
         return form_data, action_url
 
-    def extract_config_from_script(self, html_content):
-        """Extract configuration data from JavaScript in the page"""
-        soup = BeautifulSoup(html_content, 'html.parser')
-        config = {}
-
-        # Try to find the $Config object
-        scripts = soup.find_all('script')
-        for script in scripts:
-            if script.string and '$Config' in script.string:
-                # Extract JSON-like config
-                match = re.search(r'\$Config\s*=\s*({.*?});', script.string, re.DOTALL)
-                if match:
-                    try:
-                        config = json.loads(match.group(1))
-                    except:
-                        pass
-
-        return config
-
     def login(self, initial_url=None):
         """
         Perform the complete login flow
@@ -80,107 +131,141 @@ class AzureADLogin:
             # Step 1: Get the initial login page
             print("[1/4] Getting initial login page...")
 
-            if initial_url:
-                response = self.session.get(initial_url, allow_redirects=True)
-            else:
-                # Read from the HTML file to get the initial URL
-                with open('Sign in to your account.html', 'r', encoding='utf-8') as f:
-                    html_content = f.read()
-                soup = BeautifulSoup(html_content, 'html.parser')
-                form = soup.find('form', {'id': 'i0281'})
-                if form:
-                    initial_url = form.get('action')
-                    response = self.session.get(initial_url, allow_redirects=True)
-                else:
-                    print("Error: Could not find login form in HTML file")
-                    return None
+            if not initial_url:
+                print("Error: initial_url must be provided in credentials.json")
+                return None
+
+            response = self.session.get(initial_url, allow_redirects=True)
 
             if response.status_code != 200:
                 print(f"Error: Failed to get login page (status {response.status_code})")
                 return None
 
-            # Step 2: Submit username
-            print("[2/4] Submitting username...")
-            form_data, action_url = self.extract_form_data(response.text, 'i0281')
+            print(f"  Loaded: {response.url}")
 
-            if not form_data:
-                print("Error: Could not extract form data")
+            # Step 2: Extract config and submit username
+            print("[2/4] Submitting username...")
+
+            config = self.extract_config_from_script(response.text)
+
+            if not config:
+                print("  Warning: Could not extract $Config, trying fallback method")
+                form_data, action_url = self.extract_form_data(response.text)
+                if not form_data:
+                    print("Error: Could not extract form data")
+                    return None
+                form_data['loginfmt'] = self.username
+                form_data['login'] = self.username
+            else:
+                print(f"  Extracted config with {len(config)} keys")
+                # Build form data from config
+                form_data = self.build_form_data_from_config(config, username=self.username)
+                # Get action URL from config
+                action_url = config.get('urlPost') or config.get('urlPostAad')
+
+            if not action_url:
+                print("Error: Could not determine post URL")
                 return None
 
-            # Add username
-            form_data['loginfmt'] = self.username
-            form_data['login'] = self.username
+            print(f"  Posting to: {action_url}")
 
             # Post username
-            if not action_url.startswith('http'):
-                # Relative URL, build absolute
-                parsed = urlparse(response.url)
-                action_url = f"{parsed.scheme}://{parsed.netloc}{action_url}"
-
             response = self.session.post(action_url, data=form_data, allow_redirects=True)
 
             if response.status_code != 200:
                 print(f"Error: Username submission failed (status {response.status_code})")
                 return None
 
-            # Check if we need to enter password
-            if 'passwd' in response.text or 'password' in response.text.lower():
-                # Step 3: Submit password
-                print("[3/4] Submitting password...")
-                form_data, action_url = self.extract_form_data(response.text, 'i0281')
+            print(f"  Response URL: {response.url}")
 
+            # Step 3: Submit password
+            print("[3/4] Submitting password...")
+
+            config = self.extract_config_from_script(response.text)
+
+            if not config:
+                print("  Warning: Could not extract $Config, trying fallback method")
+                form_data, action_url = self.extract_form_data(response.text)
                 if not form_data:
                     print("Error: Could not extract password form data")
                     return None
-
-                # Add password
                 form_data['passwd'] = self.password
+            else:
+                print(f"  Extracted config with {len(config)} keys")
+                # Build form data from config
+                form_data = self.build_form_data_from_config(config, username=self.username, password=self.password)
+                # Get action URL from config
+                action_url = config.get('urlPost') or config.get('urlPostAad')
 
-                # Post password
-                if not action_url.startswith('http'):
-                    parsed = urlparse(response.url)
-                    action_url = f"{parsed.scheme}://{parsed.netloc}{action_url}"
+            if not action_url:
+                print("Error: Could not determine post URL for password")
+                return None
 
-                response = self.session.post(action_url, data=form_data, allow_redirects=True)
+            print(f"  Posting to: {action_url}")
 
-                if response.status_code != 200:
-                    print(f"Error: Password submission failed (status {response.status_code})")
-                    return None
+            # Post password
+            response = self.session.post(action_url, data=form_data, allow_redirects=True)
+
+            if response.status_code != 200:
+                print(f"Error: Password submission failed (status {response.status_code})")
+                return None
+
+            print(f"  Response URL: {response.url}")
 
             # Step 4: Handle "Stay signed in?" prompt if present
             print("[4/4] Completing login flow...")
+
             if 'Stay signed in' in response.text or 'KmsiInterrupt' in response.text:
-                form_data, action_url = self.extract_form_data(response.text)
+                print("  Handling 'Stay signed in?' prompt...")
+
+                config = self.extract_config_from_script(response.text)
+
+                if config:
+                    form_data = self.build_form_data_from_config(config)
+                    form_data['LoginOptions'] = '1'  # Don't stay signed in
+                    action_url = config.get('urlPost')
+                else:
+                    form_data, action_url = self.extract_form_data(response.text)
+                    if form_data:
+                        form_data['LoginOptions'] = '1'
 
                 if form_data and action_url:
-                    # Choose to stay signed in
-                    form_data['DontShowAgain'] = 'true'
-
-                    if not action_url.startswith('http'):
-                        parsed = urlparse(response.url)
-                        action_url = f"{parsed.scheme}://{parsed.netloc}{action_url}"
-
                     response = self.session.post(action_url, data=form_data, allow_redirects=True)
+                    print(f"  Response URL: {response.url}")
 
             # Check for successful login
-            if 'sign out' in response.text.lower() or 'logout' in response.text.lower():
+            final_url = response.url.lower()
+
+            if 'learning.london.edu' in final_url or 'london.instructure.com' in final_url:
+                print("✓ Login successful!")
+                print(f"  Final URL: {response.url}")
+                print(f"  Cookies: {len(self.session.cookies)} cookie(s) stored")
+                return self.session
+            elif 'sign out' in response.text.lower() or 'logout' in response.text.lower():
                 print("✓ Login successful!")
                 print(f"  Final URL: {response.url}")
                 print(f"  Cookies: {len(self.session.cookies)} cookie(s) stored")
                 return self.session
             else:
                 # Check for error messages
-                if 'error' in response.text.lower():
+                if 'error' in response.text.lower() or 'incorrect' in response.text.lower():
                     soup = BeautifulSoup(response.text, 'html.parser')
-                    error_div = soup.find('div', {'id': 'errorText'})
+                    error_div = soup.find('div', {'id': 'errorText'}) or soup.find('div', {'id': 'passwordError'})
                     if error_div:
                         print(f"✗ Login failed: {error_div.get_text(strip=True)}")
                     else:
-                        print("✗ Login failed: Unknown error")
+                        print("✗ Login failed: Check your credentials")
+                    return None
                 else:
                     print("✓ Login appears successful (verification ambiguous)")
                     print(f"  Final URL: {response.url}")
                     print(f"  Cookies: {len(self.session.cookies)} cookie(s) stored")
+
+                    # Save response for debugging
+                    with open('last_response.html', 'w', encoding='utf-8') as f:
+                        f.write(response.text)
+                    print(f"  Saved response to last_response.html for inspection")
+
                     return self.session
 
         except Exception as e:

@@ -1,6 +1,7 @@
 # Credentials and session files
 credentials.json
 session.json
+last_response.html
 
 # Python
 __pycache__/
