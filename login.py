@@ -15,9 +15,7 @@ import time
 
 
 class AzureADLogin:
-    def __init__(self, username, password):
-        self.username = username
-        self.password = password
+    def __init__(self):
         self.driver = None
         self.cookies = {}
 
@@ -193,20 +191,17 @@ class AzureADLogin:
             print(f"✗ Error finding element: {e}")
             return None
 
-    def login(self, initial_url=None):
+    def login(self, initial_url="https://learning.london.edu"):
         """
         Perform the complete login flow using Selenium
 
         Args:
-            initial_url: The initial login URL (e.g., https://learning.london.edu)
+            initial_url: The initial login URL (default: https://learning.london.edu)
 
         Returns:
             webdriver.Chrome: Selenium WebDriver instance with active session, or None if failed
         """
         try:
-            if not initial_url:
-                print("✗ Error: initial_url must be provided in credentials.json")
-                return None
 
             # Setup Selenium driver
             if not self.setup_driver():
@@ -261,31 +256,14 @@ class AzureADLogin:
 
 def main():
     """Main entry point"""
-    # Load credentials from config file
-    try:
-        with open('credentials.json', 'r') as f:
-            creds = json.load(f)
-            username = creds.get('username')
-            password = creds.get('password')
-            initial_url = creds.get('initial_url')
-    except FileNotFoundError:
-        print("✗ Error: credentials.json not found")
-        print("\nPlease create a credentials.json file with your login details:")
-        print('''{
-  "username": "your.email@domain.com",
-  "password": "your_password",
-  "initial_url": "https://learning.london.edu"
-}''')
-        sys.exit(1)
-
-    if not username or not password:
-        print("✗ Error: username and password must be provided in credentials.json")
-        sys.exit(1)
+    print("="*60)
+    print("London Business School - Learning Portal Login")
+    print("="*60)
 
     # Create login instance using context manager
-    with AzureADLogin(username, password) as login:
+    with AzureADLogin() as login:
         # Attempt login
-        driver = login.login(initial_url)
+        driver = login.login()
 
         if driver:
             print("\n✓ You can now use the 'driver' object to interact with the page")
