@@ -232,29 +232,52 @@ class AzureADLogin:
         Perform the complete login flow
 
         Args:
-            initial_url: The initial login URL. If None, uses the one from the HTML file.
+            initial_url: The initial login URL (e.g., https://learning.london.edu)
 
         Returns:
             requests.Session: Authenticated session object
         """
         try:
-            # Step 1: Get the initial login page
-            print("[1/4] Getting initial login page...")
+            # Step 1: Get the initial page and follow redirects
+            print("[1/5] Accessing application...")
 
             if not initial_url:
                 print("Error: initial_url must be provided in credentials.json")
                 return None
 
+            print(f"  Starting from: {initial_url}")
+
+            # Follow redirects to Microsoft login
             response = self.session.get(initial_url, allow_redirects=True)
 
             if response.status_code != 200:
-                print(f"Error: Failed to get login page (status {response.status_code})")
+                print(f"Error: Failed to access application (status {response.status_code})")
                 return None
 
-            print(f"  Loaded: {response.url}")
+            # Show redirect chain
+            if hasattr(response, 'history') and response.history:
+                print(f"  Redirected through {len(response.history)} URL(s)")
+                for i, hist_resp in enumerate(response.history[-2:], 1):  # Show last 2 redirects
+                    print(f"    {i}. {hist_resp.url[:80]}...")
+
+            print(f"  Final URL: {response.url}")
+
+            # Check if we're already authenticated (no login required)
+            final_url = response.url.lower()
+            if 'learning.london.edu' in final_url or 'london.instructure.com' in final_url:
+                if 'login' not in final_url and 'saml' not in final_url:
+                    print("✓ Already authenticated! No login required.")
+                    print(f"  Cookies: {len(self.session.cookies)} cookie(s) stored")
+                    return self.session
+
+            # Check if we reached a Microsoft login page
+            if 'login.microsoftonline.com' not in response.url:
+                print(f"Warning: Unexpected URL - expected Microsoft login page")
+                print(f"  Got: {response.url}")
+                # Continue anyway, might still work
 
             # Step 2: Extract config and submit username
-            print("[2/4] Submitting username...")
+            print("\n[2/5] Submitting username...")
 
             config = self.extract_config_from_script(response.text)
 
@@ -291,7 +314,7 @@ class AzureADLogin:
             print(f"  Response URL: {response.url}")
 
             # Step 3: Submit password
-            print("[3/4] Submitting password...")
+            print("\n[3/5] Submitting password...")
 
             config = self.extract_config_from_script(response.text)
 
@@ -326,13 +349,13 @@ class AzureADLogin:
 
             print(f"  Response URL: {response.url}")
 
-            # Step 3.5: Handle Microsoft Authenticator if required
+            # Step 4: Handle Microsoft Authenticator if required
             if 'Authenticator' in response.text and 'displaySign' in response.text:
-                print("\n[3.5/4] Microsoft Authenticator required...")
+                print("\n[4/5] Microsoft Authenticator required...")
                 response = self.wait_for_auth_approval(response)
 
-            # Step 4: Handle "Stay signed in?" prompt if present
-            print("[4/4] Completing login flow...")
+            # Step 5: Handle "Stay signed in?" prompt if present
+            print("\n[5/5] Completing login flow...")
 
             if 'Stay signed in' in response.text or 'KmsiInterrupt' in response.text:
                 print("  Handling 'Stay signed in?' prompt...")
