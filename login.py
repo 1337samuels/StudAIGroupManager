@@ -456,18 +456,35 @@ class AzureADLogin:
                     print("  Initiating authentication request...")
                     print(f"  Config keys found: {list(config.keys())[:20]}")  # Debug: show config keys
 
-                    # Build form data for MFA (use MFA-specific form data)
-                    form_data = self.build_form_data_from_config(config, for_mfa=True)
-                    form_data['AuthMethodId'] = 'PhoneAppNotification'
+                    # Loop to handle multiple ConvergedTFA/BssoInterrupt redirects
+                    max_mfa_redirects = 5
+                    mfa_redirect_count = 0
 
-                    # Try ProcessAuth first (urlPost), which is the standard flow for selecting auth method
-                    if 'urlPost' in config:
+                    while mfa_redirect_count < max_mfa_redirects:
+                        # Check if we're still on an MFA selection page
+                        if 'ConvergedTFA' not in response.text:
+                            print(f"  No longer on ConvergedTFA page, exiting MFA redirect loop")
+                            break
+
+                        mfa_redirect_count += 1
+                        print(f"\n  === MFA redirect attempt {mfa_redirect_count}/{max_mfa_redirects} ===")
+
+                        # Extract fresh config from current page
+                        config = self.extract_config_from_script(response.text)
+                        if not config or 'urlPost' not in config:
+                            print("  No urlPost found, exiting MFA redirect loop")
+                            break
+
+                        # Build form data for MFA (use MFA-specific form data)
+                        form_data = self.build_form_data_from_config(config, for_mfa=True)
+                        form_data['AuthMethodId'] = 'PhoneAppNotification'
+
+                        # POST to ProcessAuth to select authentication method
                         print(f"  Using urlPost (ProcessAuth) to select authentication method")
                         auth_url = config['urlPost']
                         auth_url = self.make_absolute_url(auth_url, response.url)
                         print(f"  Posting to: {auth_url}")
                         print(f"  Form data keys: {list(form_data.keys())}")
-                        print(f"  Form data fields: {form_data}")
 
                         response = self.session.post(auth_url, data=form_data, allow_redirects=True)
                         print(f"  ProcessAuth response status: {response.status_code}")
@@ -501,47 +518,15 @@ class AzureADLogin:
                                 print(f"  Saved resubmit response to bsso_resubmit_response.html")
                             else:
                                 print("  Warning: Could not extract oPostParams from BssoInterrupt page")
+                                break
 
-                    # Fallback: try BeginAuth if urlPost doesn't work or doesn't exist
-                    elif 'urlBeginAuth' in config:
-                        print(f"  Using urlBeginAuth to initiate authentication")
-                        form_data['Method'] = 'BeginAuth'
+                        # Loop will continue and check if we're still on ConvergedTFA at the top
 
-                        begin_url = config['urlBeginAuth']
-                        begin_url = self.make_absolute_url(begin_url, response.url)
-                        print(f"  Posting to: {begin_url}")
-                        print(f"  Form data keys: {list(form_data.keys())}")
-                        print(f"  Form data fields: {form_data}")
-
-                        begin_response = self.session.post(
-                            begin_url,
-                            data=form_data,
-                            headers={'Content-Type': 'application/x-www-form-urlencoded'},
-                            allow_redirects=True
-                        )
-                        print(f"  BeginAuth response status: {begin_response.status_code}")
-                        print(f"  BeginAuth response URL: {begin_response.url}")
-
-                        # Save BeginAuth response for debugging
-                        with open('begin_auth_response.html', 'w', encoding='utf-8') as f:
-                            f.write(begin_response.text)
-                        print(f"  Saved BeginAuth response to begin_auth_response.html")
-
-                        # Now poll once to get the page with the approval number
-                        print("  Fetching approval number...")
-                        poll_url = config.get('urlEndAuth') or config.get('urlPost')
-                        if poll_url:
-                            poll_url = self.make_absolute_url(poll_url, response.url)
-                            form_data = self.build_form_data_from_config(config, for_mfa=True)
-                            # Add polling method
-                            form_data['Method'] = 'EndAuth'
-                            form_data['AuthMethodId'] = 'PhoneAppNotification'
-
-                            response = self.session.post(poll_url, data=form_data, allow_redirects=True)
-                            print(f"  Poll response URL: {response.url}")
-                        else:
-                            print("  Warning: Could not determine polling URL after BeginAuth")
-                            response = begin_response
+                    # After loop exits, we should have the approval page
+                    if mfa_redirect_count >= max_mfa_redirects:
+                        print(f"  Warning: Reached maximum MFA redirects ({max_mfa_redirects})")
+                    else:
+                        print(f"  Successfully exited MFA redirect loop after {mfa_redirect_count} attempts")
 
                 # Now wait for approval
                 response = self.wait_for_auth_approval(response)
