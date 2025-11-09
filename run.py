@@ -498,18 +498,75 @@ class StudyGroupManager:
 
         print("  Parsing Class List data...")
 
-        # This is a placeholder - actual parsing will depend on the iframe structure
-        # We'll look for patterns like tables, lists, or data attributes
-        # For now, create placeholder structure
+        # Find all student profile cards
+        # Each student is in an <li> with class 'profile-box list-group-item cl-profileItem'
+        profile_cards = soup.find_all('li', class_='profile-box')
 
+        print(f"  Found {len(profile_cards)} student profiles")
+
+        # Create a mapping of student data
+        student_data = {}
+
+        for card in profile_cards:
+            try:
+                # Extract student name from displayName field
+                name_elem = card.find('h5', {'name': 'displayName'})
+                if not name_elem:
+                    name_elem = card.find('div', {'name': 'displayName'})
+
+                if not name_elem:
+                    continue
+
+                student_name = name_elem.get_text(strip=True)
+
+                # Extract nationality/origin
+                origin_elem = card.find('div', {'name': 'nationality-country'})
+                origin = origin_elem.get_text(strip=True) if origin_elem else 'Not specified'
+
+                # Extract job title and employer
+                job_elem = card.find('div', {'name': 'jobTitle-employerName'})
+                occupation = job_elem.get_text(strip=True) if job_elem and job_elem.get_text(strip=True) else 'Not specified'
+
+                # Extract education
+                edu_elem = card.find('div', {'name': 'education'})
+                education = edu_elem.get_text(strip=True) if edu_elem and edu_elem.get_text(strip=True) else 'Not specified'
+
+                # Store in mapping
+                student_data[student_name] = {
+                    'origin': origin,
+                    'education': education,
+                    'previous_occupation': occupation
+                }
+
+            except Exception as e:
+                print(f"    Warning: Error parsing student card: {e}")
+                continue
+
+        # Match study group members with extracted data
+        found_count = 0
         for member in self.study_group_members:
-            self.member_details[member] = {
-                'origin': 'Extracted from Class List',
-                'education': 'Details pending - parsing implementation needed',
-                'previous_occupation': 'Details pending - parsing implementation needed'
-            }
+            if member in student_data:
+                self.member_details[member] = student_data[member]
+                found_count += 1
+            else:
+                # Try partial match (first name + last name)
+                matched = False
+                for full_name, data in student_data.items():
+                    if member.lower() in full_name.lower() or full_name.lower() in member.lower():
+                        self.member_details[member] = data
+                        found_count += 1
+                        matched = True
+                        break
 
-        print(f"  ✓ Extracted details for {len(self.member_details)} members")
+                if not matched:
+                    # No match found
+                    self.member_details[member] = {
+                        'origin': 'Not found in Class List',
+                        'education': 'Not found in Class List',
+                        'previous_occupation': 'Not found in Class List'
+                    }
+
+        print(f"  ✓ Extracted details for {found_count}/{len(self.study_group_members)} members")
 
     def _create_placeholder_member_details(self):
         """Create placeholder data for members"""
