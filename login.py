@@ -418,8 +418,26 @@ class AzureADLogin:
             print(f"  Response URL: {response.url}")
 
             # Step 4: Handle Microsoft Authenticator if required
-            if 'Authenticator' in response.text and 'displaySign' in response.text:
+            if 'Authenticator' in response.text or 'ConvergedTFA' in response.text or 'PhoneAppNotification' in response.text:
                 print("\n[4/5] Microsoft Authenticator required...")
+
+                # Check if we need to initiate auth first (BeginAuth)
+                config = self.extract_config_from_script(response.text)
+                if config and 'urlBeginAuth' in config:
+                    print("  Initiating authentication request...")
+
+                    # Build form data and call BeginAuth
+                    form_data = self.build_form_data_from_config(config)
+                    form_data['AuthMethodId'] = 'PhoneAppNotification'
+                    form_data['Method'] = 'BeginAuth'
+
+                    begin_url = config['urlBeginAuth']
+                    begin_url = self.make_absolute_url(begin_url, response.url)
+
+                    response = self.session.post(begin_url, data=form_data, allow_redirects=True)
+                    print(f"  Auth initiated, response URL: {response.url}")
+
+                # Now wait for approval
                 response = self.wait_for_auth_approval(response)
 
             # Step 5: Handle "Stay signed in?" prompt if present
