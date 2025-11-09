@@ -33,6 +33,31 @@ class AzureADLogin:
         parsed = urlparse(base_url)
         return f"{parsed.scheme}://{parsed.netloc}{url}"
 
+    def extract_saml_form(self, html_content):
+        """Extract SAML auto-submit form if present"""
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Look for forms with SAMLRequest or SAMLResponse
+        forms = soup.find_all('form')
+        for form in forms:
+            form_data = {}
+            action = form.get('action')
+
+            # Check if this form contains SAML data
+            has_saml = False
+            for input_field in form.find_all('input'):
+                name = input_field.get('name')
+                value = input_field.get('value', '')
+                if name:
+                    form_data[name] = value
+                    if name in ['SAMLRequest', 'SAMLResponse', 'RelayState']:
+                        has_saml = True
+
+            if has_saml and action:
+                return form_data, action
+
+        return None, None
+
     def extract_approval_number(self, html_content):
         """Extract the approval number for Microsoft Authenticator"""
         soup = BeautifulSoup(html_content, 'html.parser')
@@ -269,6 +294,24 @@ class AzureADLogin:
                     print("✓ Already authenticated! No login required.")
                     print(f"  Cookies: {len(self.session.cookies)} cookie(s) stored")
                     return self.session
+
+            # Check for SAML auto-submit form
+            saml_form, saml_action = self.extract_saml_form(response.text)
+            if saml_form and saml_action:
+                print("  Detected SAML SSO flow, submitting SAML request...")
+
+                # Make action URL absolute
+                saml_action = self.make_absolute_url(saml_action, response.url)
+                print(f"  SAML target: {saml_action}")
+
+                # Submit SAML form
+                response = self.session.post(saml_action, data=saml_form, allow_redirects=True)
+
+                if response.status_code != 200:
+                    print(f"Error: SAML submission failed (status {response.status_code})")
+                    return None
+
+                print(f"  After SAML: {response.url}")
 
             # Check if we reached a Microsoft login page
             if 'login.microsoftonline.com' not in response.url:
