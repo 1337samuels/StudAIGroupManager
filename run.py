@@ -470,35 +470,46 @@ class StudyGroupManager:
                     # Try to click the "Students" tab/button to load student data
                     print("  Looking for Students tab...")
                     try:
-                        # Try different possible selectors for the Students button
                         students_button = None
 
-                        # Try finding by text "Students"
+                        # Try CSS selector first (most specific)
                         try:
-                            students_button = self.driver.find_element(By.XPATH, "//*[contains(text(), 'Students')]")
+                            students_button = self.driver.find_element(By.CSS_SELECTOR, '#cl-profileLayoutTabs > li:nth-child(2) > a')
+                            print("  Found Students button via CSS selector")
                         except:
                             pass
 
-                        # Try finding by partial link text
+                        # Try by href attribute
                         if not students_button:
                             try:
-                                students_button = self.driver.find_element(By.PARTIAL_LINK_TEXT, 'Students')
+                                students_button = self.driver.find_element(By.CSS_SELECTOR, 'a[href="/ClassList/DPO/Student/List"]')
+                                print("  Found Students button via href")
                             except:
                                 pass
 
-                        # Try finding button or link with "Students" in it
+                        # Try exact XPath
                         if not students_button:
                             try:
-                                students_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Students')]")
+                                students_button = self.driver.find_element(By.XPATH, '/html/body/div[2]/div/div[2]/ul/li[2]/a')
+                                print("  Found Students button via XPath")
+                            except:
+                                pass
+
+                        # Fallback: Try finding by partial link text
+                        if not students_button:
+                            try:
+                                students_button = self.driver.find_element(By.PARTIAL_LINK_TEXT, 'Students')
+                                print("  Found Students button via partial link text")
                             except:
                                 pass
 
                         if students_button:
-                            print("  ✓ Found Students button, clicking...")
+                            print("  ✓ Clicking Students button...")
                             students_button.click()
                             time.sleep(5)  # Wait for student data to load
+                            print("  ✓ Students data should now be loaded")
                         else:
-                            print("  Students button not found, trying to proceed anyway...")
+                            print("  ⚠ Students button not found, trying to proceed anyway...")
 
                     except Exception as e:
                         print(f"  Warning: Could not click Students button: {e}")
