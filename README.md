@@ -83,18 +83,20 @@ The markdown report includes:
 
 ```
 StudAIGroupManager/
-├── run.py                  # ⭐ THE ONLY SCRIPT YOU RUN
-├── login.py                # Utility: Login logic
-├── analyze_dashboard.py    # Utility: Dashboard parsing
-├── get_groups.py           # Utility: Groups extraction
-├── requirements.txt        # Dependencies
-├── README.md               # This file
+├── run.py                     # ⭐ THE ONLY SCRIPT - All functionality in one file
+├── requirements.txt           # Python dependencies
+├── README.md                  # This file
+├── .gitignore                 # Git ignore rules
 │
-├── session.json            # Your saved session (auto-generated)
-└── study_group_report.md   # Generated report for LLM
+├── resources/                 # HTML files for testing (gitignored)
+│   └── README.md              # Info about resource files
+│
+└── Generated files (gitignored):
+    ├── session.json           # Your saved session (auto-generated)
+    └── study_group_report.md  # Generated markdown report
 ```
 
-**Note:** The utility files (`login.py`, `analyze_dashboard.py`, `get_groups.py`) are imported by `run.py` - you don't run them directly.
+**Clean and simple:** Just one Python file (`run.py`) containing all the logic!
 
 ## Example Output
 
