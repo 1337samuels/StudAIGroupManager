@@ -286,10 +286,17 @@ class StudyGroupManager:
                     assignment['type'] = parts[1]
 
             # Extract title and due date
-            sr_span = item.find('span', class_='css-r9cwls-screenReaderContent')
-            if sr_span:
-                sr_text = sr_span.get_text(strip=True)
+            # Note: There are multiple screenReader spans - one for checkbox, one for actual data
+            # We need the one with date information (contains "due" or "at")
+            sr_spans = item.find_all('span', class_='css-r9cwls-screenReaderContent')
+            sr_text = None
+            for span in sr_spans:
+                text = span.get_text(strip=True)
+                if 'due' in text.lower() or 'at' in text.lower():
+                    sr_text = text
+                    break
 
+            if sr_text:
                 # Extract title
                 title_match = re.match(r'^(.*?),', sr_text)
                 if title_match:
