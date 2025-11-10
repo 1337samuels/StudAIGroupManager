@@ -467,7 +467,43 @@ class StudyGroupManager:
                     self.driver.switch_to.frame(iframe)
                     time.sleep(2)
 
-                    # Try to find student data
+                    # Try to click the "Students" tab/button to load student data
+                    print("  Looking for Students tab...")
+                    try:
+                        # Try different possible selectors for the Students button
+                        students_button = None
+
+                        # Try finding by text "Students"
+                        try:
+                            students_button = self.driver.find_element(By.XPATH, "//*[contains(text(), 'Students')]")
+                        except:
+                            pass
+
+                        # Try finding by partial link text
+                        if not students_button:
+                            try:
+                                students_button = self.driver.find_element(By.PARTIAL_LINK_TEXT, 'Students')
+                            except:
+                                pass
+
+                        # Try finding button or link with "Students" in it
+                        if not students_button:
+                            try:
+                                students_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Students')]")
+                            except:
+                                pass
+
+                        if students_button:
+                            print("  ✓ Found Students button, clicking...")
+                            students_button.click()
+                            time.sleep(5)  # Wait for student data to load
+                        else:
+                            print("  Students button not found, trying to proceed anyway...")
+
+                    except Exception as e:
+                        print(f"  Warning: Could not click Students button: {e}")
+
+                    # Get page source after clicking Students tab
                     page_source = self.driver.page_source
 
                     # Check if we have student data
