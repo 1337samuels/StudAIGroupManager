@@ -1,0 +1,56 @@
+# Credentials and session files
+credentials.json
+session.json
+last_response.html
+initial_response.html
+initial_error_response.html
+begin_auth_response.html
+mfa_page.html
+process_auth_response.html
+bsso_resubmit_response.html
+
+# Analysis output files
+all_assignments.json
+upcoming_assignments.json
+groups_info.json
+study_groups.json
+study_group_report.md
+*.html
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
