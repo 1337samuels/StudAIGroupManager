@@ -340,12 +340,14 @@ class StudyGroupManager:
             if link:
                 assignment['url'] = link['href']
 
-            # Filter - only upcoming items
-            if 'due_datetime' in assignment:
-                if today <= assignment['due_datetime'] <= next_week:
-                    self.assignments.append(assignment)
+            # Filter - only upcoming Assignment items (exclude calendar events)
+            if 'due_datetime' in assignment and 'type' in assignment:
+                # Only include Assignment and Quiz types, exclude calendar events
+                if assignment['type'] in ['Assignment', 'Quiz']:
+                    if today <= assignment['due_datetime'] <= next_week:
+                        self.assignments.append(assignment)
 
-        print(f"✓ Found {len(self.assignments)} upcoming assignments/events")
+        print(f"✓ Found {len(self.assignments)} upcoming assignments")
 
         # Sort by due date
         self.assignments.sort(key=lambda x: x.get('due_datetime', datetime.max))
