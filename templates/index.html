@@ -44,10 +44,13 @@
 
                         <div class="output-container" id="student-allocation-output" style="display: none;">
                             <div class="output-header">
-                                <span class="output-title">AI Response</span>
-                                <button class="btn-clear" onclick="clearOutput('llm')">Clear</button>
+                                <span class="output-title">AI Response (Preview)</span>
+                                <div class="output-actions">
+                                    <button class="btn-view" onclick="showFullResponse('student-llm-output')">📖 View Full Response</button>
+                                    <button class="btn-clear" onclick="clearOutput('llm')">Clear</button>
+                                </div>
                             </div>
-                            <pre class="output" id="student-llm-output"></pre>
+                            <pre class="output output-preview" id="student-llm-output"></pre>
                         </div>
 
                         <div class="history-section">
@@ -83,10 +86,13 @@
 
                         <div class="output-container" id="student-chat-output" style="display: none;">
                             <div class="output-header">
-                                <span class="output-title">AI Response</span>
-                                <button class="btn-clear" onclick="clearStudentChatOutput()">Clear</button>
+                                <span class="output-title">AI Response (Preview)</span>
+                                <div class="output-actions">
+                                    <button class="btn-view" onclick="showFullResponse('student-chat-response')">📖 View Full Response</button>
+                                    <button class="btn-clear" onclick="clearStudentChatOutput()">Clear</button>
+                                </div>
                             </div>
-                            <pre class="output" id="student-chat-response"></pre>
+                            <pre class="output output-preview" id="student-chat-response"></pre>
                         </div>
 
                         <div class="history-section">
@@ -226,10 +232,13 @@
 
                         <div class="output-container" id="llm-output-container" style="display: none;">
                             <div class="output-header">
-                                <span class="output-title">AI Response</span>
-                                <button class="btn-clear" onclick="clearOutput('llm')">Clear</button>
+                                <span class="output-title">AI Response (Preview)</span>
+                                <div class="output-actions">
+                                    <button class="btn-view" onclick="showFullResponse('llm-output')">📖 View Full Response</button>
+                                    <button class="btn-clear" onclick="clearOutput('llm')">Clear</button>
+                                </div>
                             </div>
-                            <pre class="output" id="llm-output"></pre>
+                            <pre class="output output-preview" id="llm-output"></pre>
                         </div>
                     </div>
                 </div>
@@ -239,6 +248,23 @@
         <footer>
             <p>LBS Study Group Manager © 2025</p>
         </footer>
+
+        <!-- Full Response Modal -->
+        <div id="response-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>AI Response</h2>
+                    <button class="modal-close" onclick="closeModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="modal-response-text" class="modal-response"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="copyResponse()">📋 Copy to Clipboard</button>
+                    <button class="btn btn-primary" onclick="closeModal()">Close</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -728,6 +754,42 @@
             } else {
                 const text = await response.text();
                 output.textContent = 'Server Error: ' + response.status + '\n' + text.substring(0, 500);
+            }
+        }
+
+        // Modal functions
+        function showFullResponse(outputId) {
+            const output = document.getElementById(outputId);
+            const modal = document.getElementById('response-modal');
+            const modalText = document.getElementById('modal-response-text');
+
+            if (output && modal && modalText) {
+                modalText.textContent = output.textContent;
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden'; // Prevent background scrolling
+            }
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('response-modal');
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto'; // Restore scrolling
+        }
+
+        function copyResponse() {
+            const modalText = document.getElementById('modal-response-text');
+            navigator.clipboard.writeText(modalText.textContent).then(() => {
+                alert('Response copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+            });
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('response-modal');
+            if (event.target === modal) {
+                closeModal();
             }
         }
 

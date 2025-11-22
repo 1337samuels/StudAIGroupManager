@@ -298,7 +298,26 @@ Please provide:
             process_outputs['llm']['output'] += 'AI WEEKLY PLAN\n'
             process_outputs['llm']['output'] += '=' * 80 + '\n\n'
             process_outputs['llm']['output'] += response + '\n\n'
-            process_outputs['llm']['output'] += '=' * 80 + '\n'
+
+            # Try to extract JSON config from response
+            try:
+                import re
+                # Look for JSON objects in the response
+                json_pattern = r'\{[^{}]*"booking_date"[^{}]*\}'
+                json_matches = re.findall(json_pattern, response, re.DOTALL)
+
+                if json_matches:
+                    # Try to parse the first match as JSON
+                    config_json = json.loads(json_matches[0])
+                    # Save to room_booking_config.json
+                    with open('room_booking_config.json', 'w') as f:
+                        json.dump(config_json, f, indent=2)
+                    process_outputs['llm']['output'] += '\n✓ Extracted and saved room booking configuration to room_booking_config.json\n'
+                    process_outputs['llm']['output'] += f'Config: {json.dumps(config_json, indent=2)}\n'
+            except Exception as e:
+                process_outputs['llm']['output'] += f'\n⚠ Could not extract booking config from AI response: {str(e)}\n'
+
+            process_outputs['llm']['output'] += '\n' + '=' * 80 + '\n'
             process_outputs['llm']['output'] += '✓ Planning completed!\n'
 
         except Exception as e:
