@@ -657,15 +657,20 @@
                         } else if (isStudentBooking) {
                             document.getElementById('student-booking-btn').disabled = false;
                         } else {
-                            // Allocation completed - automatically trigger room booking
+                            // Allocation completed
                             document.getElementById('request-allocation-btn').disabled = false;
 
-                            // Auto-trigger room booking after allocation
-                            if (processType === 'llm' && !isChat) {
-                                console.log('Allocation complete, auto-triggering room booking...');
-                                setTimeout(() => {
-                                    studentBookRoom();
-                                }, 1000); // Small delay to let user see completion
+                            // Only auto-trigger room booking if AI successfully extracted booking config
+                            if (processType === 'llm' && !isChat && data.output) {
+                                // Check if the output contains the success message for JSON extraction
+                                if (data.output.includes('✓ Extracted and saved room booking configuration')) {
+                                    console.log('Allocation complete with booking config, auto-triggering room booking...');
+                                    setTimeout(() => {
+                                        studentBookRoom();
+                                    }, 1000); // Small delay to let user see completion
+                                } else {
+                                    console.log('Allocation complete, but no booking config extracted. Skipping auto-booking.');
+                                }
                             }
                         }
                     } else {
