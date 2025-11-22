@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<!-- saved from url=(0014)about:internet -->
+<html class="ui-mobile js flexbox flexboxlegacy canvas canvastext webgl no-touch geolocation postmessage no-websqldatabase indexeddb hashchange history draganddrop websockets rgba hsla multiplebgs backgroundsize borderimage borderradius boxshadow textshadow opacity cssanimations csscolumns cssgradients cssreflections csstransforms csstransforms3d csstransitions fontface generatedcontent video audio localstorage sessionstorage webworkers no-applicationcache svg inlinesvg smil svgclippaths"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <!--<base href=".">--><base href=".">
+    <title>LBS Mobile</title>
+    
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-tap-highlight" content="no">
+    <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width">
+
+    <link rel="icon" type="image/png" href="https://lbsmobile.london.edu/favicon.png">
+    <link rel="apple-touch-icon-precomposed" href="https://lbsmobile.london.edu/favicon.png">
+    <style data-fullcalendar=""></style><link href="./LBS Mobile login_files/css" rel="stylesheet">
+
+    <link rel="stylesheet" type="text/css" href="./LBS Mobile login_files/jquery.mobile-1.4.5.min.css">
+    <link rel="stylesheet" href="./LBS Mobile login_files/jquery-ui.min.css">
+    <link rel="stylesheet" href="./LBS Mobile login_files/jquery-ui.structure.min.css">
+    <link rel="stylesheet" href="./LBS Mobile login_files/jquery-ui.theme.min.css">
+    <link rel="stylesheet" href="./LBS Mobile login_files/jquery-ui.datepicker.mobile.css">
+    <link rel="stylesheet" href="./LBS Mobile login_files/fullcalendar.min.css">    
+    <link rel="stylesheet" href="./LBS Mobile login_files/lbscustom.min.css">
+    <!-- <link rel="stylesheet" href="css/lbsmobile.css" /> //only for SIT -->
+    <link rel="stylesheet" href="./LBS Mobile login_files/lbsmobile.css">
+	
+    <!-- pull refresh <script type='text/javascript' src='scripts/lib/jquery-p2r-master/jquery.p2r.min.js'></script>-->
+
+<!-- Hotjar Tracking Code for http://lbsmobile.london.edu -->
+<script>
+    (function(h,o,t,j,a,r){
+        h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
+        h._hjSettings={hjid:1313896,hjsv:6};
+        a=o.getElementsByTagName('head')[0];
+        r=o.createElement('script');r.async=1;
+        r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
+        a.appendChild(r);
+    })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+</script><script async="" src="./LBS Mobile login_files/hotjar-1313896.js.download"></script>
+
+<script async="" src="./LBS Mobile login_files/modules.ce37dfc81afa6fcb9f03.js.download" charset="utf-8"></script></head>
+
+<body id="lbs" class="ui-mobile-viewport ui-overlay-a">
+    <!--
+        *****
+        Main Page
+        *****
+        -->
+    <div id="main" data-role="page" data-theme="a" data-url="main" tabindex="0" class="ui-page ui-page-theme-a ui-page-active" style="min-height: 791px;">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+        </header> 
+        <div class="button-container">
+            <a id="userBookings" href="https://lbsmobile.london.edu/#bookings" data-role="button" data-theme="a" class="lbs-btn-default lbs-btn-fullwidth ui-btn ui-shadow ui-corner-all" role="button" style="display: none;">My Bookings</a>
+            <a id="userCalendar" data-role="button" data-theme="a" class="lbs-btn-default lbs-btn-fullwidth ui-btn ui-shadow ui-corner-all" role="button" style="display: none;">My LBS Live Calendar</a>
+            <a id="signInSignOut" href="javascript:void(0);" data-role="button" data-theme="a" class="lbs-btn-secondary lbs-btn-fullwidth ui-btn ui-shadow ui-corner-all" onclick="signIn(&#39;redirect&#39;);" role="button">Sign In</a>
+        </div>       
+        <br style="clear: both;">
+    </div>
+
+    <!--
+        *****
+        User Bookings Page
+        *****
+        -->
+    <div id="bookings" data-role="page" data-theme="a" data-url="bookings">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label id="userBookingsHeadingLabel" class="lbs-ui-title">My Room, Table Bookings</label>
+        </header>
+
+        <div id="content" data-role="content" data-theme="a">
+            <div class="ui-grid-a">
+                <div class="button-container">
+                    <a id="checkRoomButton" href="https://lbsmobile.london.edu/#checkroompage" class="toCheckRoomPage lbs-btn-default lbs-btn-link" data-role="button" data-theme="a">Check Room</a>
+                    <button type="button" value="Book Room" class="toBookingPage lbs-btn-default" data-inline="true">Book Room</button>
+                    <button id="bookDeskOptionButton" type="button" value="Book Desk" class="toDeskBookingPage lbs-btn-default" data-inline="true">Book Desk</button>
+                    <button id="bookTableOptionButton" type="button" value="Book Table" class="toTableBookingPage  lbs-btn-default" data-inline="true">Book Table</button>
+                    <button id="refreshbookings" class="lbs-btn-default" data-inline="true" data-theme="a">Refresh</button>
+                    <h3 id="currentConfirmedH2" name="currentConfirmedH2">Loading....</h3>
+                </div>
+            </div>
+
+            <div class="hide-in-mobile">
+                <div id="legend-section">
+                    <img class="legend-image" src="./LBS Mobile login_files/checkedin.png">
+                    <span class="legend-text">Checked In</span>
+                    <span>&nbsp;&nbsp;&nbsp;</span>
+                    <img class="legend-image" src="./LBS Mobile login_files/sharing.png">
+                    <span class="legend-text">Happy to Share Room</span>
+                </div>
+            </div>
+            <div class="show-in-mobile">
+                <div id="legend-section-mobile">
+                    <div class="legend-span-mobile">
+                        <span class="legend-image-span">
+                            <img class="legend-image" src="./LBS Mobile login_files/checkedin.png">&nbsp;
+                        </span>
+                        <span class="legend-text-mobile">Checked In</span>
+                    </div>
+                    <div class="legend-span-mobile">
+                        <span class="legend-image-span">
+                            <img class="legend-image" src="./LBS Mobile login_files/sharing.png">&nbsp;
+                        </span>
+                        <span class="legend-text-mobile">Happy to Share Room</span>
+                    </div>
+                </div>
+            </div>
+
+            <p>
+                </p><div id="bookingsListContainer"></div>
+            <p></p>
+            <div class="ui-grid-a button-container">
+                <a href="https://lbsmobile.london.edu/#main" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary" data-role="button" data-theme="a">Back</a>
+                <a href="https://lbsmobile.london.edu/#helppage" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary" data-role="button" data-theme="a">Help</a>
+            </div>
+        </div>
+        <br style="clear: both;">
+    </div>
+
+    <!--
+        *****
+        New Room Booking Page
+        *****
+        -->
+    <div id="newbookingpage" data-role="page" data-title="New Booking" data-theme="a" data-url="newbookingpage">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">New Room Booking</label>
+        </header>
+        <div data-role="content" data-theme="a">
+            <form id="newBookingCriteriaForm" method="get" action="https://lbsmobile.london.edu/">
+
+                <div data-role="fieldcontain">
+                    <label for="bookingdatepicker">Booking Date</label>
+                    <input id="bookingdatepicker" type="text" data-role="date" readonly="readonly" data-theme="a">
+				</div>
+                <div data-role="fieldcontain">					
+                    <label for="starthourbox" data-theme="a">Start Time</label>
+                    <fieldset data-role="controlgroup" data-type="horizontal">
+                        <select id="starthourbox" data-theme="a" data-inline="true"></select>
+                        <select id="startminutesbox" data-theme="a" data-inline="true"></select>
+                    </fieldset>
+				</div>	
+				<div data-role="fieldcontain">
+					<label for="durationbox">Duration</label>
+					<select id="durationbox" data-inline="true" data-theme="a"></select>
+				</div>
+				<div data-role="fieldcontain">
+					<label for="noofattendees">Attendees</label>
+					<input type="range" id="noofattendees" value="1" min="1" max="10" data-theme="a">
+				</div>
+                
+                <div id="moreoptions" data-theme="a" data-content-theme="a">
+                    <h4>Optional:</h4>
+                    <div data-role="fieldcontain">
+                        <label for="meetingTitlebox">Booking Title</label>
+                        <input id="meetingTitlebox" placeholder="Booking Title" type="text" data-theme="a">
+                    </div>
+					<div data-role="fieldcontain">
+						<label for="sitebox">Building</label>
+						<select id="sitebox" placeholder="Building" data-theme="a"></select>
+					<!--
+					<label for="projector">Projector</label>
+					<input id="projector" name="projector" data-theme="a" type="checkbox">
+					<input id="whiteboard" name="whiteboard" data-theme="a" type="checkbox">
+					<label for="whiteboard">White board</label>
+					-->
+					</div>
+					<div id="happyToShareDIV" data-role="fieldcontain">
+						<label for="happyToShare">Happy to Share Room</label>
+						<input id="happyToShare" type="checkbox" data-theme="a">
+					</div>
+                </div>
+                <div class="ui-grid-a button-container">
+                    <a href="https://lbsmobile.london.edu/#bookings" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary">Back</a>
+                    <button type="submit" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-inline="true">Rooms</button>
+                </div>
+            </form>
+        </div>
+        <br style="clear: both;">
+    </div>
+
+    <!--
+    *****
+    New Desk Booking Page
+    *****
+    -->
+    <div id="newdeskbookingpage" data-role="page" data-title="New Desk Booking" data-theme="a" data-url="newdeskbookingpage">
+        <header class="container">
+            <div class="header header-main">
+                <label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">New Desk Booking</label>
+        </header>
+        <div data-role="content" data-theme="a">
+            <form id="newDeskBookingCriteriaForm" method="get" action="https://lbsmobile.london.edu/">    
+                <div data-role="fieldcontain">
+                    <label for="deskbookingdatepicker">Booking Date</label>
+                    <input id="deskbookingdatepicker" type="text" data-role="date" readonly="readonly" data-theme="a">
+                </div>
+                <div data-role="fieldcontain">					
+                    <label for="deskstarthourbox" data-theme="a">Start Time</label>
+                    <fieldset data-role="controlgroup" data-type="horizontal">
+                        <select id="deskstarthourbox" data-theme="a" data-inline="true"></select>
+                        <select id="deskstartminutesbox" data-theme="a" data-inline="true"></select>
+                    </fieldset>
+                </div>	
+                <div data-role="fieldcontain">
+                    <label for="deskdurationbox">Duration</label>
+                    <select id="deskdurationbox" data-inline="true" data-theme="a"></select>
+                </div>
+                
+                <div class="ui-grid-a button-container">
+                    <a href="https://lbsmobile.london.edu/#bookings" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary">Back</a>
+                    <button type="submit" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-inline="true">Desks</button>
+                </div>
+            </form>
+        </div>
+        <br style="clear: both;">
+    </div>
+    
+    <!--
+        *****
+        New Table Booking Page
+        *****
+        -->
+    <div id="newtablebookingpage" data-role="page" data-title="New Table Booking" data-theme="a" data-url="newtablebookingpage">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">New Table Booking</label>
+        </header>
+        <div data-role="content" data-theme="a">
+            <form id="newTableBookingCriteriaForm" method="get" action="https://lbsmobile.london.edu/">
+                <div data-role="fieldcontain">
+                    <label for="tablebookingdatepicker">Booking Date</label>
+                    <input id="tablebookingdatepicker" type="text" data-role="date" readonly="readonly" data-theme="a">
+				</div>
+                <div data-role="fieldcontain">					
+                    <label for="tablestarthourbox" data-theme="a">Start Time</label>
+                    <fieldset data-role="controlgroup" data-type="horizontal">
+                        <select id="tablestarthourbox" data-theme="a" data-inline="true"></select>
+                        <select id="tablestartminutesbox" data-theme="a" data-inline="true"></select>
+                    </fieldset>
+				</div>	
+				<div data-role="fieldcontain">
+					<label for="tabledurationbox">Duration</label>
+					<select id="tabledurationbox" data-inline="true" data-theme="a"></select>
+				</div>
+				
+                <div id="moretablebookingoptions" data-theme="a" data-content-theme="a">
+                    <h4>Optional:</h4>
+                    <div data-role="fieldcontain">
+                        <label for="tablemeetingTitlebox">Booking Title</label>
+                        <input id="tablemeetingTitlebox" placeholder="Booking Title" type="text" data-theme="a">
+                    </div>
+                    <div data-role="fieldcontain">
+                        <label for="clcroombox">Room:</label>
+                        <select id="clcroombox" placeholder="Room" data-theme="a"></select>
+                    </div>
+                </div>
+                
+                <div class="ui-grid-a button-container">
+                    <a href="https://lbsmobile.london.edu/#bookings" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary">Back</a>
+                    <button type="submit" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-inline="true">Tables</button>
+                </div>
+            </form>
+        </div>
+        <br style="clear: both;">
+    </div>
+	
+    <!--
+        *****
+        Show Available Rooms and confirm booking Page
+        *****
+        -->
+    <div id="bookingroomlist" data-role="page" data-title="Available Rooms" data-theme="a" data-url="bookingroomlist">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">Available Rooms</label>
+        </header>
+        <div data-role="content" data-theme="a">
+            <div>
+                <a href="https://lbsmobile.london.edu/#bookings" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary" data-role="button" data-mini="true" data-inline="true" data-theme="a">Abort</a>
+            </div>
+            <h2 id="availableRoomsMessage"></h2>
+            <div id="availblerooms" data-role="fieldcontain"></div>
+            <form id="newBookingForm" action="https://lbsmobile.london.edu/">
+                <div class="button-container">
+                    <a href="https://lbsmobile.london.edu/#newbookingpage" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary">Back</a>
+                    <button type="submit" id="bookButton" value="Book" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-inline="true">Book</button>
+                </div>
+            </form>
+        </div>
+        <br style="clear: both">
+    </div>
+
+    <!--
+        *****
+        Show Available Desks and confirm booking Page
+        *****
+        -->
+        <div id="bookingdeskslist" data-role="page" data-title="Available Rooms" data-theme="a" data-url="bookingdeskslist">
+            <header class="container">
+                <div class="header header-main">
+                    <label class="user-details"></label>
+                </div>            
+                <label class="lbs-ui-title">Available Desks</label>
+            </header>
+            <div data-role="content" data-theme="a">
+                <div>
+                    <a href="https://lbsmobile.london.edu/#bookings" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary" data-role="button" data-mini="true" data-inline="true" data-theme="a">Abort</a>
+                </div>
+                <h2 id="availableDesksMessage"></h2>
+                <div id="availbledesks" data-role="fieldcontain"></div>
+                <form id="newDeskBookingForm" action="https://lbsmobile.london.edu/">
+                    <div class="button-container">
+                        <a href="https://lbsmobile.london.edu/#newdeskbookingpage" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary">Back</a>
+                        <button type="submit" id="bookDeskButton" value="Book" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-inline="true">Book</button>
+                    </div>
+                </form>
+            </div>
+            <br style="clear: both">
+        </div>
+    
+    <!--
+        *****
+        Show Available Tables and confirm booking Page
+        *****
+        -->
+    <div id="bookingtableslist" data-role="page" data-title="Available Tables" data-theme="a" data-url="bookingtableslist">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">Available Tables</label>
+        </header>
+        <div data-role="content" data-theme="a">
+            <div>
+                <a href="https://lbsmobile.london.edu/#bookings" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary" data-role="button" data-mini="true" data-inline="true" data-thee="a">Abort</a>
+            </div>
+            <h2 id="availableTablesMessage"></h2>
+			<h3 id="clcRoomName"></h3>
+            <div id="availbletables" data-role="fieldcontain"></div>
+            <form id="newTableBookingForm" action="https://lbsmobile.london.edu/">
+                <div class="button-container">
+                    <a href="https://lbsmobile.london.edu/#newtablebookingpage" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary">Back</a>
+                    <button type="submit" id="bookTableButton" value="Book" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-inline="true">Book</button>
+                </div>
+            </form>
+        </div>
+        <br style="clear: both">
+    </div>
+	
+    <!--
+        *****
+        Confirmed New Booking Dialog page
+        *****
+        -->
+    <div id="bookingSuccessfulDialog" data-role="page" data-title="Successful Booking" data-theme="a" data-url="bookingSuccessfulDialog">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">Booking Result</label>
+        </header>
+        <div data-role="content">
+            <p>
+                </p><h4>Your booking was successful.</h4>
+            <p></p>
+            <div class="ui-grid-a button-container">
+                <a id="confirmedBookingOK" href="https://lbsmobile.london.edu/#" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-role="button" data-theme="a">OK</a>
+            </div>
+			
+        </div>
+        <br style="clear: both;">
+    </div>
+
+    <!--
+        *****
+        Failed Room Booking Dialog page
+        *****
+        -->
+    <div id="bookingFailedDialog" data-role="page" data-title="Failed Booking" data-theme="a" data-url="bookingFailedDialog">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">Room Booking Failed</label>
+        </header>
+        <div data-role="content">
+            <p id="failedBookingMessage">
+                
+            </p>            
+            <div class="ui-grid-a button-container">
+                <a href="https://lbsmobile.london.edu/#newbookingpage" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-role="button" data-theme="a">OK</a>
+            </div>			
+        </div>
+        <br style="clear: both;">
+    </div>
+
+    <!--
+        *****
+        Failed Desk Booking Dialog page
+        *****
+        -->
+        <div id="deskbookingFailedDialog" data-role="page" data-title="Failed Booking" data-theme="a" data-url="deskbookingFailedDialog">
+            <header class="container">
+                <div class="header header-main">
+                    <label class="user-details"></label>
+                </div>            
+                <label class="lbs-ui-title">Desk Booking Failed</label>
+            </header>
+            <div data-role="content">
+                <p id="deskFailedBookingMessage">
+                    
+                </p>            
+                <div class="ui-grid-a button-container">
+                    <a href="https://lbsmobile.london.edu/#newdeskbookingpage" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-role="button" data-theme="a">OK</a>
+                </div>			
+            </div>
+            <br style="clear: both;">
+        </div>
+    
+    <!--
+        *****
+        Failed Table Booking Dialog page
+        *****
+        -->
+    <div id="tableBookingFailedDialog" data-role="page" data-title="Failed Booking" data-theme="a" data-url="tableBookingFailedDialog">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">Table Booking Failed</label>
+        </header>
+        <div data-role="content">
+            <p id="tableFailedBookingMessage">
+                
+            </p>            
+            <div class="ui-grid-a button-container">
+                <a href="https://lbsmobile.london.edu/#newtablebookingpage" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-role="button" data-theme="a">OK</a>
+            </div>			
+        </div>
+        <br style="clear: both;">
+    </div>	
+    <!--
+        *****
+        Cancel Booking Dialog page
+        *****
+        -->
+    <div id="canceldialog" data-role="page" data-title="Cancel Booking" data-theme="a" data-url="canceldialog">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">Booking Cancellation</label>
+        </header>
+        <div data-role="content">
+            <h4>Are you sure you want to Cancel the booking?</h4>
+
+            <div class="ui-grid-a button-container">
+                <a href="https://lbsmobile.london.edu/#bookings" id="cancelbookingButton" data-role="button" data-theme="a">Yes, cancel</a>            
+                <a href="https://lbsmobile.london.edu/#" data-role="button" class="backToBookingsButton" data-theme="a">No</a>
+            </div>
+
+        </div>
+        <br style="clear: both;">
+    </div>
+
+    <!--
+        *****
+        Invalid Room Booking Date Dialog page
+        *****
+        -->
+    <div id="invalidBookingDateDialog" data-role="page" data-title="Invalid Booking Date" data-theme="a" data-url="invalidBookingDateDialog">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">Booking Error</label>
+        </header>
+        <div data-role="content">
+            <p>
+                </p><h4>The booking date and start time has already expired. Please select a valid booking date and start time.</h4>
+            <p></p>
+            <div class="ui-grid-a button-container">
+                <a href="https://lbsmobile.london.edu/#newbookingpage" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary">Back</a>
+            </div>
+        </div>
+    </div>
+
+    <!--
+        *****
+        Invalid Room Desk Date Dialog page
+        *****
+        -->
+        <div id="invalidDeskBookingDateDialog" data-role="page" data-title="Invalid Booking Date" data-theme="a" data-url="invalidDeskBookingDateDialog">
+            <header class="container">
+                <div class="header header-main">
+                    <label class="user-details"></label>
+                </div>            
+                <label class="lbs-ui-title">Booking Error</label>
+            </header>
+            <div data-role="content">
+                <p>
+                    </p><h4>The booking date and start time has already expired. Please select a valid booking date and start time.</h4>
+                <p></p>
+                <div class="ui-grid-a button-container">
+                    <a href="https://lbsmobile.london.edu/#newdeskbookingpage" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary">Back</a>
+                </div>
+            </div>
+        </div>
+        
+    <!--
+        *****
+        Invalid Table Booking Date Dialog page
+        *****
+        -->
+    <div id="invalidTableBookingDateDialog" data-role="page" data-title="Invalid Booking Date" data-theme="a" data-url="invalidTableBookingDateDialog">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">Booking Error</label>
+        </header>
+        <div data-role="content">
+            <p>
+                </p><h4>The booking date and start time has already expired. Please select a valid booking date and start time.</h4>
+            <p></p>
+            <div class="ui-grid-a button-container">
+                <a href="https://lbsmobile.london.edu/#newtablebookingpage" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary">Back</a>
+            </div>
+        </div>
+    </div>
+	
+    <!--
+        *****
+        Main Help page
+        *****
+        -->
+    <div id="helppage" name="helppage" data-role="page" data-title="Help" data-theme="a" data-url="helppage">
+        <header class="container">
+            <!--<div data-role="header" data-theme="a" class="mobile-header">-->
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">Help</label>
+        </header>
+        <div data-role="content">
+            <p>
+                Please contact the Space Planning team via space@london.edu for booking related enquiries.
+            </p>
+            <p>
+                Please contact help@london.edu for all other enquiries.
+            </p>
+            <p>
+                Note: When accessed as a web page, the site only works with a HTML5 capable browser. (E.g. Latest Firefox, Chrome, Edge, Safari, etc.)
+            </p>
+        </div>
+        <br style="clear: both;">
+        <div class="ui-grid-a button-container">
+            <a href="https://lbsmobile.london.edu/#bookings" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary" data-role="button" data-theme="a">Back</a>
+        </div>
+    </div>
+
+    <!--
+        *****
+        Check Room Page
+        *****
+        -->
+    <div id="checkroompage" data-role="page" data-title="Check Room" data-theme="a" data-url="checkroompage">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">Room to Check</label>
+        </header>
+        <div data-role="content" data-theme="a">
+            <h3 id="checkRoomsHeader" name="checkRoomsHeader"></h3>
+
+            <form id="checkRoomCriteriaForm" method="get" action="https://lbsmobile.london.edu/">
+
+                <div data-role="fieldcontain">
+                    <label for="checkroomsitebox">Building:</label>
+                    <select id="checkroomsitebox" name="checkroomsitebox" data-theme="a"></select>
+                </div>
+                <div data-role="fieldcontain">
+                    <label for="checkroombox">Room:</label>
+                    <select id="checkroombox" name="checkroombox" data-theme="a"></select>
+                </div>
+                <div data-role="fieldcontain">
+                    <label for="checkdatepicker">Date:</label>
+					<input id="checkdatepicker" type="text" data-role="date" readonly="readonly" data-theme="a">				
+                </div>
+				
+                <div class="ui-grid-a button-container">
+                    <a href="https://lbsmobile.london.edu/#" class="backToBookingsButton  lbs-btn-secondary" data-role="button" data-inline="true" data-theme="a">Back</a>
+                    <button type="submit" value="Check" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-inline="true">Check</button>
+                </div>
+            </form>
+        </div>
+        <br style="clear: both;">
+    </div>
+
+    <!--
+        *****
+        Show today's bookings for the Room selected
+        *****
+        -->
+    <div id="showroombookingslist" data-role="page" data-title="Room Bookings" data-theme="a" data-url="showroombookingslist">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">Room Info and Availability</label>
+        </header>
+        <div data-role="content" data-theme="a">
+            <div id="roomdetails" data-role="fieldcontain"></div>
+            <p>
+                <span id="selectedCheckDatelabel"></span>
+                </p><h2 id="checkRoomsMessage"></h2>
+                <div id="roombookingslistcontainer" data-role="fieldcontain"></div>
+            <p></p>
+            <div class="ui-grid-a button-container">
+                <a href="https://lbsmobile.london.edu/#checkroompage" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary" data-role="button" data-inline="true" data-theme="a">Back</a>                
+				<button id="checkRoomBookButton" type="button" value="Book" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-inline="true">Book</button>
+            </div>
+        </div>
+        <br style="clear: both;">
+    </div>
+
+    <!--
+        *****
+        Show the user timetable for the date selected
+        *****
+        -->
+    <div id="myCalendarpage" data-role="page" data-title="My LBS Live Calendar" data-theme="a" data-url="myCalendarpage">
+        <header class="container">
+            <div id="myCalendarHeading" class="header header-main">
+				<label class="user-details"></label>
+            </div>
+            <div data-role="content">
+                <label class="lbs-ui-title">My LBS Live Calendar</label>                
+            </div>
+        </header>
+        <div data-role="content" data-theme="a">            
+            <div id="moreoptions" data-role="collapsible" data-theme="a" data-content-theme="a">
+                <h4>More Options</h4>
+
+                <div class="button-container">
+                    <button id="calendarSubscribe" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-inline="true" data-theme="a">Subscribe</button>
+                    <button id="calendarRefresh" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-inline="true" data-theme="a">Refresh</button>
+                </div>
+
+                <div class="filter-by">
+                    <label>Include Options:</label>
+                </div>
+
+                <div id="calendarFilterOptions" data-role="fieldcontain">
+                    <label for="includeMyRoomBookings">My Room Bookings</label>
+                    <input id="includeMyRoomBookings" class="refreshCalendar" data-theme="a" type="checkbox">
+                    <label for="includeTimeTable" data-inline="true">Teaching Events</label>
+                    <input id="includeTimeTable" data-theme="a" type="checkbox" checked="">
+                </div>
+
+                <label id="includeProgrammeOfficeLabel" for="includeProgrammeOffice">Programme Office Events</label>
+                <input id="includeProgrammeOffice" class="refreshCalendar" data-theme="a" type="checkbox" checked="">
+
+                <label for="includeCareerCentre">Career Centre Events</label>
+                <input id="includeCareerCentre" class="refreshCalendar" data-theme="a" type="checkbox" checked="">
+            </div>
+        </div>
+
+        <h3 id="userCalendarHeader"></h3>
+		<p>
+			</p><div id="timezoneNote" class="calendartz-note">
+			</div>
+		<p></p>		
+        <p>
+            </p><div id="calendar"></div>
+        <p></p>
+        <div class="ui-grid-a button-container">
+            <a href="https://lbsmobile.london.edu/#main" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondaryt" data-role="button" data-theme="a">Back</a>
+        </div>
+    </div>
+
+    <!-- 
+        *****
+        Calendar Event popup to show all the event details.
+		
+		http://demos.jquerymobile.com/1.4.2/popup/
+        *****
+		-->
+    <!-- <div data-role="page"> 
+         <div id="calendarEventTitlePopup" data-role="popup" class="ui-content no-transparent-background"> 
+             <a href="#" data-rel="back" data-role="button" class="ui-btn ui-corner-all ui-shadow ui-btn-b ui-icon-delete ui-btn-icon-notext ui-btn-right">Close</a> 
+             <p id="eventPopupTitle" class="eventPopupText">event info</p> 
+         </div> 
+     </div> -->
+
+    <!--
+        *****
+        No Room was selected message
+        *****
+        -->
+    <div id="noroomwasselecteddialog" name="noroomwasselecteddialog" data-role="page" data-title="No Room Selected" data-theme="a" data-url="noroomwasselecteddialog">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">Room check Error</label>
+        </header>
+        <div data-role="content">
+            <p>
+                </p><h4>Please select a room first to check</h4>
+            <p></p>
+            <a href="https://lbsmobile.london.edu/#checkroompage" data-role="button" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-inline="true" data-theme="a">Back to the Check Room Availability</a>
+        </div>
+        <br style="clear: both;">
+    </div>
+
+    <div id="calendarSubscriptionDialog" name="calendarSubscriptionDialog" data-role="page" data-title="Subscribtion Dialog" data-theme="a" data-url="calendarSubscriptionDialog">
+        <header class="container">
+            <div class="header header-main">
+				<label class="user-details"></label>
+            </div>            
+            <label class="lbs-ui-title">Subscribe to your LBS Live Calendar</label>
+        </header>
+        <div data-role="content">
+            <form id="subscribeCalendarForm" onsubmit="return false;" method="post">
+                <p>This subscription will include the following:</p>
+                <p><span id="includeOptionsText"></span></p>
+                <p>Copy the link below and paste it into any calendar app that takes iCal feeds (Google Calendar. iCal, Outlook, etc.) Anyone with the link will be able to see your subscription.</p>
+                <input type="text" id="calendarSubscriptionLink" value="" readonly="readonly">
+            </form>
+            <div class="ui-grid-a button-container">
+                <a href="https://lbsmobile.london.edu/#myCalendarpage" class="ui-btn ui-shadow ui-corner-all lbs-btn-secondary" data-role="button" data-theme="a">Back</a>
+                <button type="submit" id="copyCalendarSubScribeLink" class="ui-btn ui-shadow ui-corner-all lbs-btn-default" data-inline="true" data-theme="a">Copy</button>
+            </div>
+        </div>
+    </div>	
+
+    <script type="text/javascript" src="./LBS Mobile login_files/msal-browser.min.js.download"></script>
+    <script type="text/javascript" src="./LBS Mobile login_files/jquery.min.js.download"></script>
+    <script type="text/javascript" src="./LBS Mobile login_files/DateFormat.js.download"></script>
+    <script type="text/javascript" src="./LBS Mobile login_files/jquery.base64.js.download"></script>
+    <script type="text/javascript" src="./LBS Mobile login_files/bowser.min.js.download"></script>
+    <script type="text/javascript" src="./LBS Mobile login_files/jquery-ui.min.js.download"></script>
+    <script type="text/javascript" src="./LBS Mobile login_files/jquery-ui.custom.js.download"></script>
+    <script type="text/javascript" src="./LBS Mobile login_files/jquery.mobile-1.4.5.min.js.download"></script>
+    <script type="text/javascript" src="./LBS Mobile login_files/moment.min.js.download"></script>
+	
+    <script type="text/javascript" src="./LBS Mobile login_files/index.global.min.js.download"></script>
+    <script type="text/javascript" src="./LBS Mobile login_files/modernizr.min.js.download"></script>
+    <script type="text/javascript" src="./LBS Mobile login_files/modernizr.roombooking.js.download"></script>
+
+    <script type="text/javascript" src="./LBS Mobile login_files/msalconfig.js.download"></script>
+    <script type="text/javascript" src="./LBS Mobile login_files/LBSRoomBookingLib.js.download"></script>
+    <script type="text/javascript" src="./LBS Mobile login_files/lbsmobile.js.download"></script>
+
+    <script type="text/javascript">
+        if (Modernizr.localstorage == false) {
+            alert("Browser or Device not supported. You need to use an HTML 5 capable browser.");
+            document.write('<script type="text/undefined">'); // stops loading the page..
+        }
+    </script>
+
+
+
+<div class="ui-loader ui-corner-all ui-body-a ui-loader-default"><span class="ui-icon-loading"></span><h1>loading</h1></div><iframe id="_hjSafeContext_35420493" title="_hjSafeContext" tabindex="-1" aria-hidden="true" src="./LBS Mobile login_files/saved_resource.html" style="display: none !important; width: 1px !important; height: 1px !important; opacity: 0 !important; pointer-events: none !important;"></iframe></body></html>
