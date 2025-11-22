@@ -26,6 +26,7 @@ class StudyGroupManager:
         self.driver = None
         self.cookies = {}
         self.assignments = []
+        self.events = []  # Separate list for calendar events
         self.study_group_members = []
         self.member_details = {}
 
@@ -244,117 +245,149 @@ class StudyGroupManager:
     # ==================== ASSIGNMENTS EXTRACTION ====================
 
     def extract_assignments_from_dashboard(self):
-        """Navigate to dashboard and extract upcoming assignments"""
+        """Navigate to Calendar Agenda and extract upcoming assignments and events"""
         print("\n" + "="*80)
-        print("STEP 2: EXTRACT UPCOMING ASSIGNMENTS")
+        print("STEP 2: EXTRACT UPCOMING ASSIGNMENTS AND EVENTS")
         print("="*80)
 
-        def navigate_to_dashboard():
-            print("\nNavigating to dashboard...")
-            self.driver.get("https://learning.london.edu")
-            time.sleep(2)
+        def navigate_to_calendar_agenda():
+            print("\nNavigating to Calendar Agenda view...")
+            self.driver.get("https://learning.london.edu/calendar#view_name=agenda")
+            time.sleep(3)
             return True
 
-        self.smart_wait_and_retry(navigate_to_dashboard)
+        self.smart_wait_and_retry(navigate_to_calendar_agenda)
 
-        # Wait for planner items to load
-        print("Waiting for dashboard content to load...")
-        time.sleep(5)
+        # Wait for agenda items to load
+        print("Waiting for calendar agenda to load...")
+        time.sleep(4)
 
         # Get page source and parse
         html = self.driver.page_source
         soup = BeautifulSoup(html, 'html.parser')
 
-        # Find all planner items
-        planner_items = soup.find_all('div', {'data-testid': 'planner-item-raw'})
-        print(f"Found {len(planner_items)} planner items")
+        # Find all agenda items (different structure than dashboard)
+        agenda_items = soup.find_all('li', class_=lambda x: x and 'agenda-event__item' in x if x else False)
+
+        # If no items found, try alternative selectors
+        if not agenda_items:
+            agenda_items = soup.find_all('li', class_='agenda-event__item')
+        if not agenda_items:
+            # Fallback to any list item in agenda
+            agenda_items = soup.find_all('li', class_=re.compile(r'.*agenda.*'))
+
+        print(f"Found {len(agenda_items)} agenda items")
 
         # Parse assignments and events
         today = datetime.now()
-        next_week = today + timedelta(days=14)  # Changed to 2 weeks
+        two_weeks = today + timedelta(days=14)
 
-        for item in planner_items:
-            assignment = {}
+        # Use sets to track unique items and avoid duplicates
+        seen_assignments = set()
+        seen_events = set()
 
-            # Extract course and type
-            type_span = item.find('span', class_=lambda x: x and 'css-65c5ma-text' in x)
-            if type_span:
-                full_type = type_span.get_text(strip=True)
-                parts = full_type.rsplit(' ', 1)
-                if len(parts) == 2:
-                    assignment['course'] = parts[0]
-                    assignment['type'] = parts[1]
+        for item in agenda_items:
+            try:
+                # Extract all text content
+                item_text = item.get_text(separator=' ', strip=True)
 
-            # Extract title and due date
-            # Note: There are multiple screenReader spans - one for checkbox, one for actual data
-            # We need the one with date information (contains "due" or "at")
-            sr_spans = item.find_all('span', class_='css-r9cwls-screenReaderContent')
-            sr_text = None
-            for span in sr_spans:
-                text = span.get_text(strip=True)
-                if 'due' in text.lower() or 'at' in text.lower():
-                    sr_text = text
-                    break
+                # Determine if this is an assignment or event
+                # Assignments typically have "Assignment" or "Quiz" in text
+                # Events have calendar markers or time ranges
 
-            if sr_text:
+                is_assignment_item = any(keyword in item_text for keyword in ['Assignment', 'Quiz', 'due'])
+                is_event_item = any(keyword in item_text for keyword in ['Calendar', 'Lecture', 'Class', 'Session'])
+
                 # Extract title
-                title_match = re.match(r'^(.*?),', sr_text)
-                if title_match:
-                    assignment['title'] = title_match.group(1).replace('Quiz ', '').replace('Assignment ', '').replace('Calendar event ', '')
+                title_elem = item.find('a', class_=re.compile(r'.*item-title.*')) or item.find('a')
+                title = title_elem.get_text(strip=True) if title_elem else 'Untitled'
 
-                # Extract due date
-                if 'due' in sr_text.lower():
-                    match = re.search(r'due\s+(\w+),\s+(\d+\s+\w+\s+\d{4})\s+(\d{2}:\d{2})', sr_text, re.IGNORECASE)
-                    if match:
-                        day_name, date_str, time_str = match.groups()
-                        assignment['due_date'] = f"{date_str} {time_str}"
-                        assignment['due_day'] = day_name
+                # Extract course/context
+                course_elem = item.find('span', class_=re.compile(r'.*context.*'))
+                course = course_elem.get_text(strip=True) if course_elem else 'Unknown Course'
+
+                # Extract date/time
+                time_elem = item.find('time') or item.find('span', class_=re.compile(r'.*date.*'))
+                date_str = time_elem.get('datetime') if time_elem and time_elem.get('datetime') else None
+
+                # Try to parse datetime
+                event_datetime = None
+                if date_str:
+                    try:
+                        # Try ISO format first
+                        event_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    except:
+                        pass
+
+                # If still no datetime, try parsing from text
+                if not event_datetime:
+                    # Look for date patterns in text
+                    date_pattern = r'(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})'
+                    time_pattern = r'(\d{1,2}):(\d{2})'
+
+                    date_match = re.search(date_pattern, item_text, re.IGNORECASE)
+                    time_match = re.search(time_pattern, item_text)
+
+                    if date_match:
+                        day, month, year = date_match.groups()
+                        time_str = f"{time_match.group(1)}:{time_match.group(2)}" if time_match else "09:00"
 
                         try:
-                            due_datetime = datetime.strptime(assignment['due_date'], "%d %B %Y %H:%M")
-                            assignment['due_datetime'] = due_datetime
-                        except:
-                            pass
-                elif 'at' in sr_text.lower():
-                    match = re.search(r'at\s+(\w+),\s+(\d+\s+\w+\s+\d{4})\s+(\d{2}:\d{2})', sr_text, re.IGNORECASE)
-                    if match:
-                        day_name, date_str, time_str = match.groups()
-                        assignment['event_date'] = f"{date_str} {time_str}"
-                        assignment['event_day'] = day_name
-
-                        try:
-                            event_datetime = datetime.strptime(assignment['event_date'], "%d %B %Y %H:%M")
-                            assignment['due_datetime'] = event_datetime
+                            date_str_full = f"{day} {month} {year} {time_str}"
+                            event_datetime = datetime.strptime(date_str_full, "%d %b %Y %H:%M")
                         except:
                             pass
 
-            # Extract location
-            location_div = item.find('div', class_='PlannerItem-styles__location')
-            if location_div:
-                location_span = location_div.find('span')
-                if location_span:
-                    assignment['location'] = location_span.get_text(strip=True)
+                # Extract location
+                location_elem = item.find('span', class_=re.compile(r'.*location.*'))
+                location = location_elem.get_text(strip=True) if location_elem else ''
 
-            # Extract URL
-            link = item.find('a', href=True)
-            if link:
-                assignment['url'] = link['href']
+                # Extract URL
+                url = title_elem['href'] if title_elem and title_elem.get('href') else ''
 
-            # Filter - include upcoming assignments, quizzes, AND calendar events (lectures)
-            if 'due_datetime' in assignment:
-                # Include Assignment and Quiz types, AND calendar events (lectures)
-                item_type = assignment.get('type', '')
-                is_assignment_or_quiz = item_type in ['Assignment', 'Quiz']
-                is_event = 'event_date' in assignment  # Calendar events have event_date
+                # Skip if no valid datetime or outside our range
+                if not event_datetime or not (today <= event_datetime <= two_weeks):
+                    continue
 
-                if is_assignment_or_quiz or is_event:
-                    if today <= assignment['due_datetime'] <= next_week:
-                        self.assignments.append(assignment)
+                # Create unique identifier to detect duplicates
+                unique_id = f"{title}|{event_datetime.strftime('%Y-%m-%d %H:%M')}|{course}"
 
-        print(f"✓ Found {len(self.assignments)} upcoming assignments and events")
+                # Categorize and add to appropriate list (avoiding duplicates)
+                if is_assignment_item and unique_id not in seen_assignments:
+                    seen_assignments.add(unique_id)
+                    self.assignments.append({
+                        'title': title,
+                        'course': course,
+                        'type': 'Quiz' if 'Quiz' in item_text else 'Assignment',
+                        'due_date': event_datetime.strftime("%d %B %Y %H:%M"),
+                        'due_day': event_datetime.strftime("%A"),
+                        'due_datetime': event_datetime,
+                        'location': location,
+                        'url': url
+                    })
+                elif is_event_item and unique_id not in seen_events:
+                    seen_events.add(unique_id)
+                    self.events.append({
+                        'title': title,
+                        'course': course,
+                        'type': 'Event',
+                        'event_date': event_datetime.strftime("%d %B %Y %H:%M"),
+                        'event_day': event_datetime.strftime("%A"),
+                        'due_datetime': event_datetime,  # For sorting
+                        'location': location,
+                        'url': url
+                    })
 
-        # Sort by due date
+            except Exception as e:
+                print(f"  Warning: Error parsing agenda item: {e}")
+                continue
+
+        print(f"✓ Found {len(self.assignments)} unique assignments")
+        print(f"✓ Found {len(self.events)} unique events")
+
+        # Sort both lists by date
         self.assignments.sort(key=lambda x: x.get('due_datetime', datetime.max))
+        self.events.sort(key=lambda x: x.get('due_datetime', datetime.max))
 
         return True
 
@@ -468,7 +501,7 @@ class StudyGroupManager:
 
         # Wait for iframe to load and switch to it
         print("Waiting for Class List iframe to load...")
-        time.sleep(8)  # Give iframe content time to load
+        time.sleep(3)  # Reduced from 8 to 3 seconds
 
         # Try to switch to iframe
         try:
@@ -478,7 +511,7 @@ class StudyGroupManager:
             for iframe in iframes:
                 try:
                     self.driver.switch_to.frame(iframe)
-                    time.sleep(2)
+                    time.sleep(1)  # Reduced from 2 to 1 second
 
                     # Try to click the "Students" tab/button to load student data
                     print("  Looking for Students tab...")
@@ -519,7 +552,7 @@ class StudyGroupManager:
                         if students_button:
                             print("  ✓ Clicking Students button...")
                             students_button.click()
-                            time.sleep(5)  # Wait for student data to load
+                            time.sleep(2)  # Reduced from 5 to 2 seconds
                             print("  ✓ Students data should now be loaded")
                         else:
                             print("  ⚠ Students button not found, trying to proceed anyway...")
@@ -652,11 +685,11 @@ class StudyGroupManager:
         report.append(f"\n*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n")
         report.append("---\n")
 
-        # Section 1: Upcoming Assignments and Events
-        report.append("## 📚 Upcoming Assignments and Events (Next 14 Days)\n")
+        # Section 1: Upcoming Assignments
+        report.append("## 📚 Upcoming Assignments (Next 14 Days)\n")
 
         if not self.assignments:
-            report.append("*No assignments or events found in the next 14 days.*\n")
+            report.append("*No assignments found in the next 14 days.*\n")
         else:
             # Group by date
             by_date = {}
@@ -688,19 +721,60 @@ class StudyGroupManager:
                     if 'due_date' in item:
                         time_str = item['due_date'].split()[-1]
                         report.append(f"- **Due:** {time_str}")
-                    elif 'event_date' in item:
-                        time_str = item['event_date'].split()[-1]
-                        report.append(f"- **Time:** {time_str}")
 
-                    if 'location' in item:
+                    if 'location' in item and item['location']:
                         report.append(f"- **Location:** {item['location']}")
 
-                    if 'url' in item:
+                    if 'url' in item and item['url']:
                         report.append(f"- **URL:** {item['url']}")
 
                     report.append("")
 
-        # Section 2: Study Group Members
+        # Section 2: Upcoming Events (Lectures/Classes)
+        report.append("\n---\n")
+        report.append("## 📅 Upcoming Events & Lectures (Next 14 Days)\n")
+
+        if not self.events:
+            report.append("*No events found in the next 14 days.*\n")
+        else:
+            # Group by date
+            events_by_date = {}
+            for event in self.events:
+                if 'due_datetime' in event:
+                    date_key = event['due_datetime'].strftime('%Y-%m-%d')
+
+                    if date_key not in events_by_date:
+                        events_by_date[date_key] = {
+                            'date': event['due_datetime'].strftime('%A, %d %B %Y'),
+                            'items': []
+                        }
+                    events_by_date[date_key]['items'].append(event)
+
+            # Output by date
+            for date_key in sorted(events_by_date.keys()):
+                date_info = events_by_date[date_key]
+                report.append(f"### {date_info['date']}\n")
+
+                for item in date_info['items']:
+                    course = item.get('course', 'Unknown Course')
+                    title = item.get('title', 'Untitled')
+
+                    report.append(f"**{course}**")
+                    report.append(f"- **Event:** {title}")
+
+                    if 'event_date' in item:
+                        time_str = item['event_date'].split()[-1]
+                        report.append(f"- **Time:** {time_str}")
+
+                    if 'location' in item and item['location']:
+                        report.append(f"- **Location:** {item['location']}")
+
+                    if 'url' in item and item['url']:
+                        report.append(f"- **URL:** {item['url']}")
+
+                    report.append("")
+
+        # Section 3: Study Group Members
         report.append("\n---\n")
         report.append("## 👥 Study Group Members\n")
 
