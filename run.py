@@ -269,9 +269,9 @@ class StudyGroupManager:
         planner_items = soup.find_all('div', {'data-testid': 'planner-item-raw'})
         print(f"Found {len(planner_items)} planner items")
 
-        # Parse assignments
+        # Parse assignments and events
         today = datetime.now()
-        next_week = today + timedelta(days=7)
+        next_week = today + timedelta(days=14)  # Changed to 2 weeks
 
         for item in planner_items:
             assignment = {}
@@ -340,14 +340,18 @@ class StudyGroupManager:
             if link:
                 assignment['url'] = link['href']
 
-            # Filter - only upcoming Assignment items (exclude calendar events)
-            if 'due_datetime' in assignment and 'type' in assignment:
-                # Only include Assignment and Quiz types, exclude calendar events
-                if assignment['type'] in ['Assignment', 'Quiz']:
+            # Filter - include upcoming assignments, quizzes, AND calendar events (lectures)
+            if 'due_datetime' in assignment:
+                # Include Assignment and Quiz types, AND calendar events (lectures)
+                item_type = assignment.get('type', '')
+                is_assignment_or_quiz = item_type in ['Assignment', 'Quiz']
+                is_event = 'event_date' in assignment  # Calendar events have event_date
+
+                if is_assignment_or_quiz or is_event:
                     if today <= assignment['due_datetime'] <= next_week:
                         self.assignments.append(assignment)
 
-        print(f"✓ Found {len(self.assignments)} upcoming assignments")
+        print(f"✓ Found {len(self.assignments)} upcoming assignments and events")
 
         # Sort by due date
         self.assignments.sort(key=lambda x: x.get('due_datetime', datetime.max))
@@ -648,11 +652,11 @@ class StudyGroupManager:
         report.append(f"\n*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n")
         report.append("---\n")
 
-        # Section 1: Upcoming Assignments
-        report.append("## 📚 Upcoming Assignments (Next 7 Days)\n")
+        # Section 1: Upcoming Assignments and Events
+        report.append("## 📚 Upcoming Assignments and Events (Next 14 Days)\n")
 
         if not self.assignments:
-            report.append("*No assignments found in the next 7 days.*\n")
+            report.append("*No assignments or events found in the next 14 days.*\n")
         else:
             # Group by date
             by_date = {}

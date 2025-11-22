@@ -274,18 +274,9 @@ def plan_week():
                 },
                 {
                     "role": "user",
-                    "content": f"""Using the given information you are expected of the following tasks:
-
-1. assignments allocation - for each upcoming assignment, assign two members of the team. one will be the assignment leader, prioritized by previous professional background relevant for the task. the other will be a mentee supporting the assignment leader while using the opportunity to learn from the assignment leader. when allocating, make sure to evenly disperse the workload among members even at the cost of professional expertise.
-
-2. room booking - for each group member duo, while taking into account the lecture schedule provided (and avoid schedule conflicts), output a json file under the same structure given under the config file. try to match the building to the building adjacent lectures are held on. assume a lecture is 3 hours long so if a lecture starts at a certain hour the members are unavailable for 3 hours.
-
-3. dispute management - if approached directly with a user prompt from one of the members asking for an advice about a dispute within the group, suggest a path to resolution which takes into account the involved cultural background and any information provided in the team agreement to suggest a path to resolve the dispute in a empathic way that will allow the members to continue working together for the rest of the year.
-
-4. social get together - find a time available for all group members and suggest a team social gathering for a quick lunch/dinner/pub. whenever prompted about the work allocation, after assigning all work tasks add a nice invite to create a social gathering to the team at the time that seems convenient to all group members. an example for such reply can be "it looks like you are all available on {{insert here date and time}}. Perhaps this might be a good time for some team {{insert here appropriate activity based on time}}?"
+                    "content": f"""What is my work allocation for the upcoming week?
 
 Here's the study group report:
-
 {report_content}
 
 Please provide:
