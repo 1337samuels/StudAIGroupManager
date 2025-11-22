@@ -6,7 +6,6 @@ This script automates the process of booking study rooms on lbsmobile.london.edu
 
 - **book_room.py** - Main room booking script
 - **room_booking_config.json** - Configuration file for booking parameters
-- **lbsmobile_session.json** - Session cookies (auto-generated after first login)
 
 ## Configuration
 
@@ -33,10 +32,10 @@ Edit `room_booking_config.json` to set your booking parameters:
    python3 book_room.py
    ```
 
-3. **First-time login:**
+3. **Login:**
    - The browser will open to lbsmobile.london.edu
+   - The "Sign In" button will be clicked automatically
    - Complete Microsoft MFA authentication manually
-   - The script will save your session for future use
 
 4. **Automatic process:**
    - Navigates to "My Bookings"
@@ -47,7 +46,7 @@ Edit `room_booking_config.json` to set your booking parameters:
 
 ## Notes
 
-- **Session Persistence:** After first login, your session is saved to `lbsmobile_session.json`. Subsequent runs won't require manual login unless the session expires.
+- **Login Required:** Each run requires manual Microsoft MFA authentication.
 
 - **Building Codes:**
   - "North Building" → NB
@@ -61,10 +60,6 @@ Edit `room_booking_config.json` to set your booking parameters:
 - **Loading Time:** The "Available Rooms" page takes a few seconds to load. The script includes appropriate wait times.
 
 ## Troubleshooting
-
-**Session expired:**
-- Delete `lbsmobile_session.json` and run the script again
-- Complete manual login when prompted
 
 **No rooms available:**
 - Try different times or dates
@@ -84,7 +79,7 @@ nano room_booking_config.json
 # 2. Run the booking script
 python3 book_room.py
 
-# 3. Complete MFA if prompted (first time only)
+# 3. Complete Microsoft MFA when prompted
 
 # 4. Script automatically books the room
 
@@ -112,4 +107,4 @@ This room booking script runs independently from `run.py` (the study group assig
 - **run.py** - Extracts assignments and study group member information from learning.london.edu
 - **book_room.py** - Books study rooms on lbsmobile.london.edu
 
-Both scripts use similar patterns for login and session management but operate on different websites.
+Both scripts use similar patterns for login but operate on different websites.

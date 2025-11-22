@@ -18,7 +18,6 @@ import json
 class RoomBooker:
     def __init__(self, config_file='room_booking_config.json'):
         self.driver = None
-        self.cookies = {}
         self.config = self.load_config(config_file)
 
     # ==================== CONFIG MANAGEMENT ====================
@@ -63,77 +62,7 @@ class RoomBooker:
             return False
 
     # ==================== COOKIE MANAGEMENT ====================
-
-    def load_and_restore_cookies(self, filename='lbsmobile_session.json'):
-        """Load cookies from file and restore them to the browser"""
-        try:
-            with open(filename, 'r') as f:
-                self.cookies = json.load(f)
-
-            if not self.driver:
-                return False
-
-            # Navigate to the domain first (cookies need a domain context)
-            self.driver.get("https://lbsmobile.london.edu")
-            time.sleep(1)
-
-            # Add each cookie to the browser
-            for name, cookie_data in self.cookies.items():
-                cookie = {
-                    'name': name,
-                    'value': cookie_data['value'],
-                    'domain': cookie_data.get('domain', '.lbsmobile.london.edu'),
-                    'path': cookie_data.get('path', '/'),
-                }
-                if 'secure' in cookie_data:
-                    cookie['secure'] = cookie_data['secure']
-
-                try:
-                    self.driver.add_cookie(cookie)
-                except Exception as e:
-                    pass  # Some cookies might fail, that's okay
-
-            print(f"✓ Loaded and restored cookies from {filename}")
-            return True
-
-        except FileNotFoundError:
-            print(f"  No session file found at {filename}")
-            return False
-        except Exception as e:
-            print(f"  Error loading session: {e}")
-            return False
-
-    def extract_cookies(self):
-        """Extract cookies from the browser session"""
-        try:
-            print("Extracting session cookies...")
-            cookies = self.driver.get_cookies()
-
-            self.cookies = {}
-            for cookie in cookies:
-                self.cookies[cookie['name']] = {
-                    'value': cookie['value'],
-                    'domain': cookie.get('domain', ''),
-                    'path': cookie.get('path', '/'),
-                    'secure': cookie.get('secure', False)
-                }
-
-            print(f"✓ Extracted {len(self.cookies)} cookies")
-            return self.cookies
-        except Exception as e:
-            print(f"✗ Error extracting cookies: {e}")
-            return {}
-
-    def save_session(self, filename='lbsmobile_session.json'):
-        """Save session cookies to a file"""
-        try:
-            with open(filename, 'w') as f:
-                json.dump(self.cookies, f, indent=2)
-            print(f"✓ Session saved to {filename}")
-            return True
-        except Exception as e:
-            print(f"✗ Error saving session: {e}")
-            return False
+    # Session management removed - fresh login required each time
 
     # ==================== LOGIN ====================
 
@@ -218,8 +147,8 @@ class RoomBooker:
             print(f"\n✗ Error during manual login wait: {e}")
             return False
 
-    def login_with_cookies(self):
-        """Login using existing cookies or manual login"""
+    def login(self):
+        """Login to lbsmobile.london.edu"""
         print("="*80)
         print("STEP 1: LOGIN TO LBSMOBILE.LONDON.EDU")
         print("="*80)
@@ -227,28 +156,10 @@ class RoomBooker:
         if not self.setup_driver():
             return False
 
-        # Try to restore cookies
-        print("\nAttempting to restore session from cookies...")
-        if self.load_and_restore_cookies():
-            print("Testing if session is still valid...")
-            self.driver.get("https://lbsmobile.london.edu")
-            time.sleep(3)
-
-            current_url = self.driver.current_url.lower()
-            if 'lbsmobile.london.edu' in current_url and not any(word in current_url for word in ['login', 'auth', 'microsoft', 'saml']):
-                print("✓ Session restored successfully! Already logged in.")
-                return True
-            else:
-                print("  Session expired or invalid. Need to login manually.")
-
-        # Manual login needed
+        # Perform manual login
         print("\nProceeding with manual login...")
         if not self.wait_for_manual_login("https://lbsmobile.london.edu"):
             return False
-
-        # Save new session
-        self.extract_cookies()
-        self.save_session()
 
         return True
 
@@ -488,7 +399,7 @@ class RoomBooker:
             print("="*80)
 
             # Step 1: Login
-            if not self.login_with_cookies():
+            if not self.login():
                 print("\n✗ Login failed")
                 return False
 
@@ -538,7 +449,7 @@ def main():
     print("LBS ROOM BOOKING SCRIPT")
     print("="*80)
     print("\nThis script will:")
-    print("  1. Login to lbsmobile.london.edu (using saved session if available)")
+    print("  1. Login to lbsmobile.london.edu (manual login required)")
     print("  2. Navigate to the room booking page")
     print("  3. Fill in booking details from room_booking_config.json")
     print("  4. Select the first available room")
