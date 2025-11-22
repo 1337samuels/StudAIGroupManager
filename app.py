@@ -507,9 +507,12 @@ Please provide:
             process_outputs['llm']['output'] += response + '\n\n'
 
             # Parse the weekly plan into structured data
-            global weekly_plan_data
-            weekly_plan_data = parse_weekly_plan(response)
-            process_outputs['llm']['output'] += f'\n✓ Parsed weekly plan: {len(weekly_plan_data["assignments"])} assignments, {len(weekly_plan_data["study_sessions"])} sessions, {len(weekly_plan_data["room_bookings"])} room bookings\n'
+            try:
+                global weekly_plan_data
+                weekly_plan_data = parse_weekly_plan(response)
+                process_outputs['llm']['output'] += f'\n✓ Parsed weekly plan: {len(weekly_plan_data["assignments"])} assignments, {len(weekly_plan_data["study_sessions"])} sessions, {len(weekly_plan_data["room_bookings"])} room bookings\n'
+            except Exception as e:
+                process_outputs['llm']['output'] += f'\n⚠ Could not parse weekly plan structure: {str(e)}\n'
 
             # Try to extract JSON config from response
             try:
@@ -531,9 +534,12 @@ Please provide:
 
             process_outputs['llm']['output'] += '\n' + '=' * 80 + '\n'
             process_outputs['llm']['output'] += '✓ Planning completed!\n'
+            process_outputs['llm']['output'] += '🔄 Preparing weekly plan dashboard...\n'
 
         except Exception as e:
             process_outputs['llm']['output'] += f'\n✗ Error: {str(e)}\n'
+            import traceback
+            process_outputs['llm']['output'] += f'\nStack trace:\n{traceback.format_exc()}\n'
         finally:
             process_outputs['llm']['running'] = False
 
