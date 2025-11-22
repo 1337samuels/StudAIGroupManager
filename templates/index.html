@@ -20,8 +20,8 @@
                 Student Mode
             </button>
             <button class="mode-toggle-btn" id="admin-mode-btn" onclick="switchMode('admin')">
-                <span class="mode-icon">⚙️</span>
-                Admin/Developer Mode
+                <span class="mode-icon">🔄</span>
+                Update Canvas Mode
             </button>
         </div>
 
@@ -134,7 +134,7 @@
             </div>
         </div>
 
-        <!-- ADMIN/DEVELOPER MODE -->
+        <!-- UPDATE CANVAS MODE -->
         <div id="admin-mode" class="mode-content">
             <div class="dashboard">
                 <!-- Assignment Extraction Card -->
@@ -168,77 +168,6 @@
                                 <button class="btn-clear" onclick="clearOutput('assignments')">Clear</button>
                             </div>
                             <pre class="output" id="assignments-output"></pre>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Room Booking Card (Admin) -->
-                <div class="card">
-                    <div class="card-header">
-                        <h2>🏢 Room Booking</h2>
-                        <span class="status-badge" id="booking-status">Ready</span>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-description">Book study rooms on lbsmobile.london.edu using configuration file</p>
-                        <button class="btn btn-primary" onclick="bookRoom()" id="booking-btn">
-                            <span class="btn-icon">🏢</span>
-                            Book Room
-                        </button>
-                        <div class="output-container" id="booking-output-container" style="display: none;">
-                            <div class="output-header">
-                                <span class="output-title">Booking Log</span>
-                                <button class="btn-clear" onclick="clearOutput('booking')">Clear</button>
-                            </div>
-                            <pre class="output" id="booking-output"></pre>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- AI Assistant Card (Admin) -->
-                <div class="card">
-                    <div class="card-header">
-                        <h2>🤖 AI Assistant</h2>
-                        <span class="status-badge" id="llm-status">Ready</span>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-description">Advanced AI queries with access to assignment data and room booking config</p>
-
-                        <div class="ai-action-section">
-                            <h3 class="action-title">📅 Plan Week</h3>
-                            <button class="btn btn-primary" onclick="planWeek()" id="plan-week-btn">
-                                <span class="btn-icon">🗓️</span>
-                                Generate Weekly Plan
-                            </button>
-                            <p class="action-hint">Analyzes assignments and creates optimal study plan with room booking suggestion</p>
-                        </div>
-
-                        <div class="divider"></div>
-
-                        <div class="ai-action-section">
-                            <h3 class="action-title">💬 Custom Query</h3>
-                            <div class="query-input-group">
-                                <textarea
-                                    id="llm-query"
-                                    placeholder="Enter custom AI query..."
-                                    rows="3"
-                                ></textarea>
-                            </div>
-                            <button class="btn btn-secondary" onclick="queryLLM()" id="llm-btn">
-                                <span class="btn-icon">🤖</span>
-                                Send Query
-                            </button>
-                            <p class="action-hint">Full access to assignment and configuration data</p>
-                        </div>
-
-                        <div class="output-container" id="llm-output-container" style="display: none;">
-                            <div class="output-header">
-                                <span class="output-title">AI Response (Preview)</span>
-                                <div class="output-actions">
-                                    <button class="btn-view" onclick="showFullResponse('llm-output')">📖 View Full Response</button>
-                                    <button class="btn-clear" onclick="clearOutput('llm')">Clear</button>
-                                </div>
-                            </div>
-                            <pre class="output output-preview" id="llm-output"></pre>
                         </div>
                     </div>
                 </div>
