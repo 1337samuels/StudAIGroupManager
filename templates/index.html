@@ -65,21 +65,40 @@
                     <span class="status-badge" id="llm-status">Ready</span>
                 </div>
                 <div class="card-body">
-                    <p>Query LBS's AI LLM platform for analysis and insights</p>
-                    <div class="query-input-group">
-                        <textarea
-                            id="llm-query"
-                            placeholder="Enter your query for the LBS AI assistant..."
-                            rows="3"
-                        ></textarea>
+                    <p>Use LBS's AI to plan your week and answer questions about your assignments</p>
+
+                    <!-- Quick Action: Plan Week -->
+                    <div class="ai-action-section">
+                        <h3 class="action-title">📅 Quick Action</h3>
+                        <button class="btn btn-primary" onclick="planWeek()" id="plan-week-btn">
+                            <span class="btn-icon">🗓️</span>
+                            Plan My Week + Suggest Room Booking
+                        </button>
+                        <p class="action-hint">Analyzes your assignments and creates an optimal study plan</p>
                     </div>
-                    <button class="btn btn-primary" onclick="queryLLM()" id="llm-btn">
-                        <span class="btn-icon">🤖</span>
-                        Send Query
-                    </button>
+
+                    <div class="divider"></div>
+
+                    <!-- Free Text Query -->
+                    <div class="ai-action-section">
+                        <h3 class="action-title">💬 Ask Anything</h3>
+                        <div class="query-input-group">
+                            <textarea
+                                id="llm-query"
+                                placeholder="Ask about your assignments, study group, or get study advice..."
+                                rows="3"
+                            ></textarea>
+                        </div>
+                        <button class="btn btn-secondary" onclick="queryLLM()" id="llm-btn">
+                            <span class="btn-icon">🤖</span>
+                            Send Query
+                        </button>
+                        <p class="action-hint">AI has access to your assignment data and room booking config</p>
+                    </div>
+
                     <div class="output-container" id="llm-output-container" style="display: none;">
                         <div class="output-header">
-                            <span class="output-title">Response</span>
+                            <span class="output-title">AI Response</span>
                             <button class="btn-clear" onclick="clearOutput('llm')">Clear</button>
                         </div>
                         <pre class="output" id="llm-output"></pre>
@@ -167,9 +186,49 @@
             }
         }
 
+        // Function to plan week with AI
+        async function planWeek() {
+            const btn = document.getElementById('plan-week-btn');
+            const llmBtn = document.getElementById('llm-btn');
+            const status = document.getElementById('llm-status');
+            const outputContainer = document.getElementById('llm-output-container');
+            const output = document.getElementById('llm-output');
+
+            btn.disabled = true;
+            llmBtn.disabled = true;
+            status.textContent = 'Running...';
+            status.className = 'status-badge status-running';
+            outputContainer.style.display = 'block';
+            output.textContent = 'Planning your week with AI...\n';
+
+            try {
+                const response = await fetch('/api/plan-week', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    startPolling('llm');
+                } else {
+                    const data = await response.json();
+                    output.textContent = 'Error: ' + data.error;
+                    btn.disabled = false;
+                    llmBtn.disabled = false;
+                    status.textContent = 'Error';
+                    status.className = 'status-badge status-error';
+                }
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                btn.disabled = false;
+                llmBtn.disabled = false;
+                status.textContent = 'Error';
+                status.className = 'status-badge status-error';
+            }
+        }
+
         // Function to query LBS AI LLM
         async function queryLLM() {
             const btn = document.getElementById('llm-btn');
+            const planBtn = document.getElementById('plan-week-btn');
             const status = document.getElementById('llm-status');
             const outputContainer = document.getElementById('llm-output-container');
             const output = document.getElementById('llm-output');
@@ -182,6 +241,7 @@
             }
 
             btn.disabled = true;
+            planBtn.disabled = true;
             status.textContent = 'Running...';
             status.className = 'status-badge status-running';
             outputContainer.style.display = 'block';
@@ -202,12 +262,14 @@
                     const data = await response.json();
                     output.textContent = 'Error: ' + data.error;
                     btn.disabled = false;
+                    planBtn.disabled = false;
                     status.textContent = 'Error';
                     status.className = 'status-badge status-error';
                 }
             } catch (error) {
                 output.textContent = 'Error: ' + error.message;
                 btn.disabled = false;
+                planBtn.disabled = false;
                 status.textContent = 'Error';
                 status.className = 'status-badge status-error';
             }
@@ -232,7 +294,6 @@
 
                 const output = document.getElementById(`${processType}-output`);
                 const status = document.getElementById(`${processType}-status`);
-                const btn = document.getElementById(`${processType}-btn`);
 
                 output.textContent = data.output;
                 output.scrollTop = output.scrollHeight;
@@ -243,7 +304,16 @@
                 } else {
                     status.textContent = 'Ready';
                     status.className = 'status-badge status-ready';
-                    btn.disabled = false;
+
+                    // Re-enable buttons based on process type
+                    if (processType === 'llm') {
+                        document.getElementById('llm-btn').disabled = false;
+                        document.getElementById('plan-week-btn').disabled = false;
+                    } else {
+                        const btn = document.getElementById(`${processType}-btn`);
+                        if (btn) btn.disabled = false;
+                    }
+
                     clearInterval(pollIntervals[processType]);
                 }
             } catch (error) {

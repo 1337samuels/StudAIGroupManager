@@ -1,6 +1,7 @@
 # Credentials and session files
 credentials.json
 session.json
+AI_API_KEYS.json
 last_response.html
 initial_response.html
 initial_error_response.html

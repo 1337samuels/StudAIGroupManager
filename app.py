@@ -11,8 +11,52 @@ import queue
 import os
 import json
 from datetime import datetime
+from openai import AzureOpenAI
 
 app = Flask(__name__)
+
+# AI API Configuration
+ai_config = None
+ai_client = None
+
+def load_ai_config():
+    """Load AI API configuration from AI_API_KEYS.json"""
+    global ai_config, ai_client
+    try:
+        with open('AI_API_KEYS.json', 'r') as f:
+            ai_config = json.load(f)
+
+        # Initialize Azure OpenAI client
+        ai_client = AzureOpenAI(
+            api_key=ai_config['api_key'],
+            api_version=ai_config['api_version'],
+            azure_endpoint=ai_config['endpoint']
+        )
+        print("✓ AI API configuration loaded successfully")
+        return True
+    except FileNotFoundError:
+        print("⚠ AI_API_KEYS.json not found - AI features will be disabled")
+        print("  Create AI_API_KEYS.json based on AI_API_KEYS.json.template")
+        return False
+    except Exception as e:
+        print(f"⚠ Failed to load AI configuration: {e}")
+        return False
+
+def query_ai(messages, stream=False):
+    """Query Azure OpenAI with messages"""
+    if not ai_client or not ai_config:
+        raise Exception("AI API not configured. Please create AI_API_KEYS.json")
+
+    response = ai_client.chat.completions.create(
+        model=ai_config['deployment_name'],
+        messages=messages,
+        stream=stream
+    )
+
+    if stream:
+        return response
+    else:
+        return response.choices[0].message.content
 
 # Store process outputs
 process_outputs = {
@@ -154,27 +198,79 @@ def book_room():
     return jsonify({'message': 'Room booking started'}), 202
 
 
-@app.route('/api/query-llm', methods=['POST'])
-def query_llm():
-    """Query LBS AI LLM platform (placeholder implementation)"""
+@app.route('/api/plan-week', methods=['POST'])
+def plan_week():
+    """Use AI to plan the upcoming week and suggest room booking"""
     if process_outputs['llm']['running']:
-        return jsonify({'error': 'LLM query is already running'}), 400
+        return jsonify({'error': 'AI query is already running'}), 400
 
-    query = request.json.get('query', '') if request.json else ''
-
-    if not query:
-        return jsonify({'error': 'No query provided'}), 400
+    if not ai_client:
+        return jsonify({'error': 'AI API not configured. Please create AI_API_KEYS.json'}), 400
 
     def run_query():
         process_outputs['llm']['running'] = True
-        process_outputs['llm']['output'] = f'Query: {query}\n\n'
+        process_outputs['llm']['output'] = '🤖 Planning your week with AI...\n\n'
         process_outputs['llm']['last_run'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         try:
-            # TODO: Implement LBS AI LLM API integration
-            # This is a placeholder implementation
-            process_outputs['llm']['output'] += '⚠ LLM integration not yet implemented\n'
-            process_outputs['llm']['output'] += 'Waiting for API details...\n'
+            # Read study group report
+            if not os.path.exists('study_group_report.md'):
+                process_outputs['llm']['output'] += '⚠ study_group_report.md not found!\n'
+                process_outputs['llm']['output'] += 'Please run assignment extraction first.\n'
+                return
+
+            with open('study_group_report.md', 'r') as f:
+                report_content = f.read()
+
+            process_outputs['llm']['output'] += '✓ Loaded study group report\n\n'
+
+            # Read current room booking config if exists
+            booking_config = {}
+            if os.path.exists('room_booking_config.json'):
+                with open('room_booking_config.json', 'r') as f:
+                    booking_config = json.load(f)
+                process_outputs['llm']['output'] += f'✓ Current booking config: {json.dumps(booking_config, indent=2)}\n\n'
+
+            process_outputs['llm']['output'] += '📡 Querying AI...\n\n'
+
+            # Prepare messages for AI
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are an AI assistant helping LBS students plan their study schedule. "
+                               "Analyze their upcoming assignments and study group information to create an optimal weekly plan."
+                },
+                {
+                    "role": "user",
+                    "content": f"""Based on the following study group report, please:
+
+1. Analyze the upcoming assignments and their due dates
+2. Create a weekly study plan prioritizing tasks
+3. Suggest optimal times for group study sessions
+4. Recommend a room booking configuration for the most critical study session
+
+Here's the study group report:
+
+{report_content}
+
+Please provide:
+- A structured weekly plan
+- Task priorities
+- Recommended study session times
+- A room booking suggestion in JSON format with: booking_date (YYYY-MM-DD), start_time (HH:MM), duration_hours, attendees, study_group_name, project_name, building (Sussex Place)
+"""
+                }
+            ]
+
+            # Query AI
+            response = query_ai(messages)
+
+            process_outputs['llm']['output'] += '=' * 80 + '\n'
+            process_outputs['llm']['output'] += 'AI WEEKLY PLAN\n'
+            process_outputs['llm']['output'] += '=' * 80 + '\n\n'
+            process_outputs['llm']['output'] += response + '\n\n'
+            process_outputs['llm']['output'] += '=' * 80 + '\n'
+            process_outputs['llm']['output'] += '✓ Planning completed!\n'
 
         except Exception as e:
             process_outputs['llm']['output'] += f'\n✗ Error: {str(e)}\n'
@@ -186,7 +282,80 @@ def query_llm():
     thread.daemon = True
     thread.start()
 
-    return jsonify({'message': 'LLM query started'}), 202
+    return jsonify({'message': 'AI planning started'}), 202
+
+
+@app.route('/api/query-llm', methods=['POST'])
+def query_llm():
+    """Query LBS AI LLM platform with free text"""
+    if process_outputs['llm']['running']:
+        return jsonify({'error': 'AI query is already running'}), 400
+
+    if not ai_client:
+        return jsonify({'error': 'AI API not configured. Please create AI_API_KEYS.json'}), 400
+
+    query = request.json.get('query', '') if request.json else ''
+
+    if not query:
+        return jsonify({'error': 'No query provided'}), 400
+
+    def run_query():
+        process_outputs['llm']['running'] = True
+        process_outputs['llm']['output'] = f'🤖 Processing query: {query}\n\n'
+        process_outputs['llm']['last_run'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        try:
+            # Read study group report if it exists
+            context = ""
+            if os.path.exists('study_group_report.md'):
+                with open('study_group_report.md', 'r') as f:
+                    report_content = f.read()
+                context += f"\n\nSTUDY GROUP REPORT:\n{report_content}\n"
+                process_outputs['llm']['output'] += '✓ Loaded study group report as context\n'
+
+            # Read room booking config if it exists
+            if os.path.exists('room_booking_config.json'):
+                with open('room_booking_config.json', 'r') as f:
+                    booking_config = json.load(f)
+                context += f"\n\nCURRENT ROOM BOOKING CONFIG:\n{json.dumps(booking_config, indent=2)}\n"
+                process_outputs['llm']['output'] += '✓ Loaded room booking config as context\n'
+
+            process_outputs['llm']['output'] += '\n📡 Querying AI...\n\n'
+
+            # Prepare messages for AI
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are an AI assistant helping LBS students with their studies. "
+                               "You have access to their assignment data and room booking information."
+                },
+                {
+                    "role": "user",
+                    "content": f"{query}{context}"
+                }
+            ]
+
+            # Query AI
+            response = query_ai(messages)
+
+            process_outputs['llm']['output'] += '=' * 80 + '\n'
+            process_outputs['llm']['output'] += 'AI RESPONSE\n'
+            process_outputs['llm']['output'] += '=' * 80 + '\n\n'
+            process_outputs['llm']['output'] += response + '\n\n'
+            process_outputs['llm']['output'] += '=' * 80 + '\n'
+            process_outputs['llm']['output'] += '✓ Query completed!\n'
+
+        except Exception as e:
+            process_outputs['llm']['output'] += f'\n✗ Error: {str(e)}\n'
+        finally:
+            process_outputs['llm']['running'] = False
+
+    # Run in background thread
+    thread = threading.Thread(target=run_query)
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({'message': 'AI query started'}), 202
 
 
 @app.route('/api/output/<process_type>')
@@ -215,6 +384,11 @@ if __name__ == '__main__':
     print("=" * 80)
     print("LBS STUDY GROUP MANAGER - WEB UI")
     print("=" * 80)
+
+    # Load AI configuration
+    print("\nLoading AI configuration...")
+    load_ai_config()
+
     print("\nStarting Flask server...")
     print("Open your browser and navigate to: http://localhost:5000")
     print("\nPress Ctrl+C to stop the server")

@@ -166,6 +166,23 @@ header h1 {
     cursor: not-allowed;
 }
 
+.btn-secondary {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    width: 100%;
+    justify-content: center;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+}
+
+.btn-secondary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .btn-icon {
     font-size: 1.2rem;
 }
@@ -184,6 +201,32 @@ header h1 {
 .btn-clear:hover {
     background: #f3f4f6;
     border-color: #9ca3af;
+}
+
+/* AI Action Sections */
+.ai-action-section {
+    margin-bottom: 20px;
+}
+
+.action-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 12px;
+}
+
+.action-hint {
+    font-size: 0.85rem;
+    color: #9ca3af;
+    margin-top: 8px;
+    margin-bottom: 0;
+    font-style: italic;
+}
+
+.divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, #e5e7eb, transparent);
+    margin: 25px 0;
 }
 
 /* Output Container */
