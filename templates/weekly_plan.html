@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Study Plan - LBS Group Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 32px;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .header .subtitle {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .back-button {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 10px 20px;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .back-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .section {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title .icon {
+            font-size: 28px;
+        }
+
+        /* Assignments Board */
+        .assignments-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .assignment-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            border-left: 5px solid #667eea;
+        }
+
+        .assignment-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .assignment-card.finance {
+            border-left-color: #667eea;
+        }
+
+        .assignment-card.accounting {
+            border-left-color: #f093fb;
+        }
+
+        .assignment-card.strategy {
+            border-left-color: #4facfe;
+        }
+
+        .assignment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .assignment-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .assignment-course {
+            font-size: 14px;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .assignment-due {
+            background: #ff6b6b;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .assignment-team {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .team-member {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .team-role {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .team-role.mentee {
+            background: #4facfe;
+        }
+
+        /* Calendar View */
+        .calendar-week {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 15px;
+        }
+
+        .calendar-day {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 15px;
+            min-height: 200px;
+        }
+
+        .calendar-day-header {
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 12px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .calendar-event {
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-left: 3px solid #667eea;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .calendar-event:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .event-time {
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 4px;
+        }
+
+        .event-project {
+            color: #666;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+
+        .event-attendees {
+            color: #999;
+            font-size: 10px;
+        }
+
+        /* Room Bookings */
+        .bookings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .booking-card {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .booking-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .booking-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .booking-date {
+            font-weight: 700;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .booking-building {
+            background: rgba(0, 0, 0, 0.1);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .booking-time {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .booking-project {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .booking-attendees {
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* Social Gathering */
+        .social-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 16px;
+            padding: 30px;
+            color: white;
+            text-align: center;
+        }
+
+        .social-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .social-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .social-date {
+            font-size: 18px;
+            margin-bottom: 15px;
+            opacity: 0.9;
+        }
+
+        .social-venue {
+            font-size: 16px;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .social-purpose {
+            font-size: 14px;
+            opacity: 0.8;
+            line-height: 1.6;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: white;
+            font-size: 18px;
+        }
+
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .assignments-grid,
+            .calendar-week,
+            .bookings-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-button">← Back to Dashboard</a>
+
+        <div class="header">
+            <h1>📚 Weekly Study Plan</h1>
+            <p class="subtitle">Your AI-generated work allocation and schedule</p>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="loading-spinner"></div>
+            Loading your weekly plan...
+        </div>
+
+        <div id="content" style="display: none;">
+            <!-- Assignments Board -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="icon">📋</span>
+                    <span>Group Projects & Assignments</span>
+                </div>
+                <div class="assignments-grid" id="assignments-grid"></div>
+            </div>
+
+            <!-- Calendar View -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="icon">📅</span>
+                    <span>Weekly Calendar</span>
+                </div>
+                <div class="calendar-week" id="calendar-week"></div>
+            </div>
+
+            <!-- Room Bookings -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="icon">🏢</span>
+                    <span>Booked Study Rooms</span>
+                </div>
+                <div class="bookings-grid" id="bookings-grid"></div>
+            </div>
+
+            <!-- Social Gathering -->
+            <div class="section" id="social-section" style="display: none;">
+                <div class="social-card" id="social-card"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Fetch and display weekly plan data
+        async function loadWeeklyPlan() {
+            try {
+                const response = await fetch('/api/weekly-plan-data');
+                const data = await response.json();
+
+                console.log('Loaded weekly plan data:', data);
+
+                // Hide loading, show content
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+
+                // Render assignments
+                renderAssignments(data.assignments);
+
+                // Render calendar
+                renderCalendar(data.study_sessions);
+
+                // Render room bookings
+                renderRoomBookings(data.room_bookings);
+
+                // Render social gathering
+                if (data.social_gathering) {
+                    renderSocialGathering(data.social_gathering);
+                }
+            } catch (error) {
+                console.error('Error loading weekly plan:', error);
+                document.getElementById('loading').innerHTML = '<p>Error loading weekly plan. Please try again.</p>';
+            }
+        }
+
+        function renderAssignments(assignments) {
+            const grid = document.getElementById('assignments-grid');
+            grid.innerHTML = '';
+
+            if (!assignments || assignments.length === 0) {
+                grid.innerHTML = '<p style="color: #666;">No assignments found.</p>';
+                return;
+            }
+
+            assignments.forEach(assignment => {
+                const courseType = assignment.course.toLowerCase().includes('finance') ? 'finance' :
+                                 assignment.course.toLowerCase().includes('accounting') ? 'accounting' :
+                                 assignment.course.toLowerCase().includes('strategy') ? 'strategy' : '';
+
+                const card = document.createElement('div');
+                card.className = `assignment-card ${courseType}`;
+                card.innerHTML = `
+                    <div class="assignment-header">
+                        <div>
+                            <div class="assignment-title">${assignment.title}</div>
+                            <div class="assignment-course">${assignment.course}</div>
+                        </div>
+                        <div class="assignment-due">${assignment.due}</div>
+                    </div>
+                    <div class="assignment-team">
+                        <div class="team-member">
+                            <span class="team-role">Leader</span>
+                            <span>${assignment.leader}</span>
+                        </div>
+                        <div class="team-member">
+                            <span class="team-role mentee">Mentee</span>
+                            <span>${assignment.mentee}</span>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function renderCalendar(sessions) {
+            const weekContainer = document.getElementById('calendar-week');
+            weekContainer.innerHTML = '';
+
+            // Get unique days from sessions
+            const dayMap = {};
+
+            sessions.forEach(session => {
+                const day = session.date;
+                if (!dayMap[day]) {
+                    dayMap[day] = [];
+                }
+                dayMap[day].push(session);
+            });
+
+            // Create calendar days
+            const days = Object.keys(dayMap).sort();
+
+            if (days.length === 0) {
+                weekContainer.innerHTML = '<p style="color: #666;">No study sessions scheduled.</p>';
+                return;
+            }
+
+            days.forEach(day => {
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'calendar-day';
+
+                let eventsHTML = '';
+                dayMap[day].forEach(event => {
+                    eventsHTML += `
+                        <div class="calendar-event">
+                            <div class="event-time">${event.start_time} - ${event.end_time}</div>
+                            <div class="event-project">${event.project}</div>
+                            <div class="event-attendees">${event.attendees}</div>
+                        </div>
+                    `;
+                });
+
+                dayDiv.innerHTML = `
+                    <div class="calendar-day-header">${day}</div>
+                    ${eventsHTML}
+                `;
+                weekContainer.appendChild(dayDiv);
+            });
+        }
+
+        function renderRoomBookings(bookings) {
+            const grid = document.getElementById('bookings-grid');
+            grid.innerHTML = '';
+
+            if (!bookings || bookings.length === 0) {
+                grid.innerHTML = '<p style="color: #666;">No room bookings found.</p>';
+                return;
+            }
+
+            bookings.forEach(booking => {
+                const card = document.createElement('div');
+                card.className = 'booking-card';
+
+                const endHour = parseInt(booking.start_time.split(':')[0]) + parseInt(booking.duration_hours);
+                const endMinute = booking.start_time.split(':')[1];
+                const endTime = `${endHour.toString().padStart(2, '0')}:${endMinute}`;
+
+                card.innerHTML = `
+                    <div class="booking-header">
+                        <div class="booking-date">${booking.booking_date}</div>
+                        <div class="booking-building">${booking.building}</div>
+                    </div>
+                    <div class="booking-time">${booking.start_time} - ${endTime} (${booking.duration_hours}h)</div>
+                    <div class="booking-project">${booking.project_name}</div>
+                    <div class="booking-attendees">👥 ${booking.attendees.join(', ')}</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function renderSocialGathering(social) {
+            const section = document.getElementById('social-section');
+            const card = document.getElementById('social-card');
+
+            section.style.display = 'block';
+            card.innerHTML = `
+                <div class="social-icon">🎉</div>
+                <div class="social-title">Social Gathering</div>
+                <div class="social-date">${social.date}</div>
+                <div class="social-venue">📍 ${social.venue}</div>
+                <div class="social-purpose">${social.purpose}</div>
+            `;
+        }
+
+        // Load data on page load
+        loadWeeklyPlan();
+    </script>
+</body>
+</html>

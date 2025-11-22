@@ -640,9 +640,17 @@
                                     console.log('Allocation complete with booking config, auto-triggering room booking...');
                                     setTimeout(() => {
                                         studentBookRoom();
+                                        // Redirect to weekly plan page after booking starts
+                                        setTimeout(() => {
+                                            window.location.href = '/weekly-plan';
+                                        }, 2000);
                                     }, 1000); // Small delay to let user see completion
                                 } else {
                                     console.log('Allocation complete, but no booking config extracted. Skipping auto-booking.');
+                                    // Redirect to weekly plan page immediately if no booking
+                                    setTimeout(() => {
+                                        window.location.href = '/weekly-plan';
+                                    }, 1500);
                                 }
                             }
                         }

@@ -89,6 +89,81 @@ output_queues = {
     'llm': queue.Queue()
 }
 
+# Store parsed weekly plan data
+weekly_plan_data = {
+    'assignments': [],
+    'study_sessions': [],
+    'room_bookings': [],
+    'social_gathering': None,
+    'raw_response': '',
+    'timestamp': None
+}
+
+def parse_weekly_plan(response):
+    """Parse AI response to extract structured weekly plan data"""
+    import re
+
+    parsed_data = {
+        'assignments': [],
+        'study_sessions': [],
+        'room_bookings': [],
+        'social_gathering': None,
+        'raw_response': response,
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+
+    # Extract assignments with leader/mentee pairs
+    # Pattern: "Problem Set 7... | Due Nov 24 16:00\n   - Leader: ...\n   - Mentee: ..."
+    assignment_pattern = r'(\d+)\.\s+(.+?)\s+-\s+(.+?)\s+\|\s+Due\s+(.+?)\n\s+-\s+Leader:\s+(.+?)\n\s+-\s+Mentee:\s+(.+?)(?:\n|$)'
+    assignment_matches = re.findall(assignment_pattern, response, re.MULTILINE)
+
+    for match in assignment_matches:
+        parsed_data['assignments'].append({
+            'number': match[0],
+            'title': match[1].strip(),
+            'course': match[2].strip(),
+            'due': match[3].strip(),
+            'leader': match[4].strip(),
+            'mentee': match[5].strip()
+        })
+
+    # Extract study session times
+    # Pattern: "- Mon Nov 24, 10:00-12:00: Jonathan & Marcos (Finance I - Problem Set 7)"
+    session_pattern = r'-\s+([A-Za-z]+\s+[A-Za-z]+\s+\d+),\s+(\d+:\d+)-(\d+:\d+):\s+(.+?)\s+\((.+?)\)'
+    session_matches = re.findall(session_pattern, response)
+
+    for match in session_matches:
+        parsed_data['study_sessions'].append({
+            'date': match[0].strip(),
+            'start_time': match[1].strip(),
+            'end_time': match[2].strip(),
+            'attendees': match[3].strip(),
+            'project': match[4].strip()
+        })
+
+    # Extract room bookings JSON
+    json_pattern = r'```json\s*(\[[\s\S]*?\])\s*```'
+    json_matches = re.findall(json_pattern, response)
+
+    if json_matches:
+        try:
+            parsed_data['room_bookings'] = json.loads(json_matches[0])
+        except:
+            pass
+
+    # Extract social gathering
+    social_pattern = r'Social Gathering Suggestion:[\s\S]*?-\s+Date:\s+(.+?)\n\s+-\s+Venue:\s+(.+?)\n\s+-\s+Purpose:\s+(.+?)(?:\n\n|$)'
+    social_match = re.search(social_pattern, response)
+
+    if social_match:
+        parsed_data['social_gathering'] = {
+            'date': social_match.group(1).strip(),
+            'venue': social_match.group(2).strip(),
+            'purpose': social_match.group(3).strip()
+        }
+
+    return parsed_data
+
 
 @app.route('/')
 def index():
@@ -431,6 +506,11 @@ Please provide:
             process_outputs['llm']['output'] += '=' * 80 + '\n\n'
             process_outputs['llm']['output'] += response + '\n\n'
 
+            # Parse the weekly plan into structured data
+            global weekly_plan_data
+            weekly_plan_data = parse_weekly_plan(response)
+            process_outputs['llm']['output'] += f'\n✓ Parsed weekly plan: {len(weekly_plan_data["assignments"])} assignments, {len(weekly_plan_data["study_sessions"])} sessions, {len(weekly_plan_data["room_bookings"])} room bookings\n'
+
             # Try to extract JSON config from response
             try:
                 import re
@@ -558,6 +638,18 @@ def clear_output(process_type):
         return jsonify({'message': 'Output cleared'})
     else:
         return jsonify({'error': 'Cannot clear output while process is running'}), 400
+
+
+@app.route('/weekly-plan')
+def weekly_plan():
+    """Serve the weekly plan visualization page"""
+    return render_template('weekly_plan.html')
+
+
+@app.route('/api/weekly-plan-data')
+def get_weekly_plan_data():
+    """Get parsed weekly plan data"""
+    return jsonify(weekly_plan_data)
 
 
 if __name__ == '__main__':

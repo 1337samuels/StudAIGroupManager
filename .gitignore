@@ -17,6 +17,8 @@ groups_info.json
 study_groups.json
 study_group_report.md
 *.html
+# But allow template files
+!templates/*.html
 
 # Python
 __pycache__/
