@@ -785,8 +785,8 @@ Please provide actionable recommendations that the study group can implement imm
             print("\nReport saved to: study_group_report.md")
             print("You can now upload this file to an LLM for analysis and recommendations.")
 
-            # Keep browser open for inspection
-            input("\n\nPress Enter to close browser and exit...")
+            # Auto-close when run from web UI (no user input needed)
+            # input("\n\nPress Enter to close browser and exit...")
 
             return True
 

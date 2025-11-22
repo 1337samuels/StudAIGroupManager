@@ -20,8 +20,8 @@
                 Student Mode
             </button>
             <button class="mode-toggle-btn" id="admin-mode-btn" onclick="switchMode('admin')">
-                <span class="mode-icon">🔄</span>
-                Update Canvas Mode
+                <span class="mode-icon">🔗</span>
+                LBS Integrations Mode
             </button>
         </div>
 
@@ -134,7 +134,7 @@
             </div>
         </div>
 
-        <!-- UPDATE CANVAS MODE -->
+        <!-- LBS INTEGRATIONS MODE -->
         <div id="admin-mode" class="mode-content">
             <div class="dashboard">
                 <!-- Assignment Extraction Card -->
@@ -168,6 +168,28 @@
                                 <button class="btn-clear" onclick="clearOutput('assignments')">Clear</button>
                             </div>
                             <pre class="output" id="assignments-output"></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Room Booking Card (Standalone) -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>🏢 Room Booking</h2>
+                        <span class="status-badge" id="booking-status">Ready</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-description">Book study rooms on lbsmobile.london.edu using configuration file</p>
+                        <button class="btn btn-primary" onclick="bookRoom()" id="booking-btn">
+                            <span class="btn-icon">🏢</span>
+                            Book Room
+                        </button>
+                        <div class="output-container" id="booking-output-container" style="display: none;">
+                            <div class="output-header">
+                                <span class="output-title">Booking Log</span>
+                                <button class="btn-clear" onclick="clearOutput('booking')">Clear</button>
+                            </div>
+                            <pre class="output" id="booking-output"></pre>
                         </div>
                     </div>
                 </div>
@@ -635,7 +657,16 @@
                         } else if (isStudentBooking) {
                             document.getElementById('student-booking-btn').disabled = false;
                         } else {
+                            // Allocation completed - automatically trigger room booking
                             document.getElementById('request-allocation-btn').disabled = false;
+
+                            // Auto-trigger room booking after allocation
+                            if (processType === 'llm' && !isChat) {
+                                console.log('Allocation complete, auto-triggering room booking...');
+                                setTimeout(() => {
+                                    studentBookRoom();
+                                }, 1000); // Small delay to let user see completion
+                            }
                         }
                     } else {
                         if (processType === 'llm') {

@@ -427,8 +427,8 @@ class RoomBooker:
             print("✓ ROOM BOOKING PROCESS COMPLETED!")
             print("="*80)
 
-            # Keep browser open for inspection
-            input("\n\nPress Enter to close browser and exit...")
+            # Auto-close when run from web UI (no user input needed)
+            # input("\n\nPress Enter to close browser and exit...")
 
             return True
 
