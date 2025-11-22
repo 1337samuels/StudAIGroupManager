@@ -15,6 +15,23 @@ from openai import AzureOpenAI
 
 app = Flask(__name__)
 
+# Global error handlers to ensure JSON responses
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'error': f'Internal server error: {str(error)}'}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(error):
+    # Log the error for debugging
+    print(f"Unhandled exception: {error}")
+    import traceback
+    traceback.print_exc()
+    return jsonify({'error': f'Server error: {str(error)}'}), 500
+
 # AI API Configuration
 ai_config = None
 ai_client = None
