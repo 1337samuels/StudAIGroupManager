@@ -97,14 +97,20 @@ def run_assignments():
         process_outputs['assignments']['last_run'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         try:
+            # Set environment to force UTF-8 encoding
+            env = os.environ.copy()
+            env['PYTHONIOENCODING'] = 'utf-8'
+
             # Run the script
             process = subprocess.Popen(
-                ['python3', 'run.py'],
+                ['python', 'run.py'],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding='utf-8',
+                errors='replace',  # Replace invalid characters instead of crashing
                 bufsize=1,
-                universal_newlines=True
+                env=env
             )
 
             # Stream output
@@ -163,14 +169,20 @@ def book_room():
         process_outputs['booking']['last_run'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         try:
+            # Set environment to force UTF-8 encoding
+            env = os.environ.copy()
+            env['PYTHONIOENCODING'] = 'utf-8'
+
             # Run the script
             process = subprocess.Popen(
-                ['python3', 'book_room.py'],
+                ['python', 'book_room.py'],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding='utf-8',
+                errors='replace',  # Replace invalid characters instead of crashing
                 bufsize=1,
-                universal_newlines=True
+                env=env
             )
 
             # Stream output
