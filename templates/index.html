@@ -131,7 +131,11 @@
 
             try {
                 const response = await fetch('/api/run-assignments', {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
                 });
 
                 if (response.ok) {
@@ -173,7 +177,11 @@
 
             try {
                 const response = await fetch('/api/book-room', {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
                 });
 
                 if (response.ok) {
