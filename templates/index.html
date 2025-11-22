@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LBS Study Group Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>LBS Study Group Manager</h1>
+            <p class="subtitle">Automated assignment extraction and room booking</p>
+        </header>
+
+        <div class="dashboard">
+            <!-- Assignment Extraction Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Assignment Extraction</h2>
+                    <span class="status-badge" id="assignments-status">Ready</span>
+                </div>
+                <div class="card-body">
+                    <p>Extract assignments and study group information from learning.london.edu</p>
+                    <button class="btn btn-primary" onclick="runAssignments()" id="assignments-btn">
+                        <span class="btn-icon">📚</span>
+                        Extract Assignments
+                    </button>
+                    <div class="output-container" id="assignments-output-container" style="display: none;">
+                        <div class="output-header">
+                            <span class="output-title">Output</span>
+                            <button class="btn-clear" onclick="clearOutput('assignments')">Clear</button>
+                        </div>
+                        <pre class="output" id="assignments-output"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Room Booking Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Room Booking</h2>
+                    <span class="status-badge" id="booking-status">Ready</span>
+                </div>
+                <div class="card-body">
+                    <p>Book study rooms on lbsmobile.london.edu using configuration file</p>
+                    <button class="btn btn-primary" onclick="bookRoom()" id="booking-btn">
+                        <span class="btn-icon">🏢</span>
+                        Book Room
+                    </button>
+                    <div class="output-container" id="booking-output-container" style="display: none;">
+                        <div class="output-header">
+                            <span class="output-title">Output</span>
+                            <button class="btn-clear" onclick="clearOutput('booking')">Clear</button>
+                        </div>
+                        <pre class="output" id="booking-output"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LBS AI LLM Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>LBS AI Assistant</h2>
+                    <span class="status-badge" id="llm-status">Ready</span>
+                </div>
+                <div class="card-body">
+                    <p>Query LBS's AI LLM platform for analysis and insights</p>
+                    <div class="query-input-group">
+                        <textarea
+                            id="llm-query"
+                            placeholder="Enter your query for the LBS AI assistant..."
+                            rows="3"
+                        ></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="queryLLM()" id="llm-btn">
+                        <span class="btn-icon">🤖</span>
+                        Send Query
+                    </button>
+                    <div class="output-container" id="llm-output-container" style="display: none;">
+                        <div class="output-header">
+                            <span class="output-title">Response</span>
+                            <button class="btn-clear" onclick="clearOutput('llm')">Clear</button>
+                        </div>
+                        <pre class="output" id="llm-output"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>LBS Study Group Manager © 2025</p>
+        </footer>
+    </div>
+
+    <script>
+        // Poll interval for checking process status
+        let pollIntervals = {};
+
+        // Function to run assignment extraction
+        async function runAssignments() {
+            const btn = document.getElementById('assignments-btn');
+            const status = document.getElementById('assignments-status');
+            const outputContainer = document.getElementById('assignments-output-container');
+            const output = document.getElementById('assignments-output');
+
+            btn.disabled = true;
+            status.textContent = 'Running...';
+            status.className = 'status-badge status-running';
+            outputContainer.style.display = 'block';
+            output.textContent = 'Starting assignment extraction...\n';
+
+            try {
+                const response = await fetch('/api/run-assignments', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    startPolling('assignments');
+                } else {
+                    const data = await response.json();
+                    output.textContent = 'Error: ' + data.error;
+                    btn.disabled = false;
+                    status.textContent = 'Error';
+                    status.className = 'status-badge status-error';
+                }
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                btn.disabled = false;
+                status.textContent = 'Error';
+                status.className = 'status-badge status-error';
+            }
+        }
+
+        // Function to book a room
+        async function bookRoom() {
+            const btn = document.getElementById('booking-btn');
+            const status = document.getElementById('booking-status');
+            const outputContainer = document.getElementById('booking-output-container');
+            const output = document.getElementById('booking-output');
+
+            btn.disabled = true;
+            status.textContent = 'Running...';
+            status.className = 'status-badge status-running';
+            outputContainer.style.display = 'block';
+            output.textContent = 'Starting room booking...\n';
+
+            try {
+                const response = await fetch('/api/book-room', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    startPolling('booking');
+                } else {
+                    const data = await response.json();
+                    output.textContent = 'Error: ' + data.error;
+                    btn.disabled = false;
+                    status.textContent = 'Error';
+                    status.className = 'status-badge status-error';
+                }
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                btn.disabled = false;
+                status.textContent = 'Error';
+                status.className = 'status-badge status-error';
+            }
+        }
+
+        // Function to query LBS AI LLM
+        async function queryLLM() {
+            const btn = document.getElementById('llm-btn');
+            const status = document.getElementById('llm-status');
+            const outputContainer = document.getElementById('llm-output-container');
+            const output = document.getElementById('llm-output');
+            const queryInput = document.getElementById('llm-query');
+            const query = queryInput.value.trim();
+
+            if (!query) {
+                alert('Please enter a query');
+                return;
+            }
+
+            btn.disabled = true;
+            status.textContent = 'Running...';
+            status.className = 'status-badge status-running';
+            outputContainer.style.display = 'block';
+            output.textContent = 'Processing query...\n';
+
+            try {
+                const response = await fetch('/api/query-llm', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+
+                if (response.ok) {
+                    startPolling('llm');
+                } else {
+                    const data = await response.json();
+                    output.textContent = 'Error: ' + data.error;
+                    btn.disabled = false;
+                    status.textContent = 'Error';
+                    status.className = 'status-badge status-error';
+                }
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                btn.disabled = false;
+                status.textContent = 'Error';
+                status.className = 'status-badge status-error';
+            }
+        }
+
+        // Start polling for output updates
+        function startPolling(processType) {
+            if (pollIntervals[processType]) {
+                clearInterval(pollIntervals[processType]);
+            }
+
+            pollIntervals[processType] = setInterval(() => {
+                updateOutput(processType);
+            }, 1000);
+        }
+
+        // Update output for a specific process
+        async function updateOutput(processType) {
+            try {
+                const response = await fetch(`/api/output/${processType}`);
+                const data = await response.json();
+
+                const output = document.getElementById(`${processType}-output`);
+                const status = document.getElementById(`${processType}-status`);
+                const btn = document.getElementById(`${processType}-btn`);
+
+                output.textContent = data.output;
+                output.scrollTop = output.scrollHeight;
+
+                if (data.running) {
+                    status.textContent = 'Running...';
+                    status.className = 'status-badge status-running';
+                } else {
+                    status.textContent = 'Ready';
+                    status.className = 'status-badge status-ready';
+                    btn.disabled = false;
+                    clearInterval(pollIntervals[processType]);
+                }
+            } catch (error) {
+                console.error('Error updating output:', error);
+            }
+        }
+
+        // Clear output for a specific process
+        async function clearOutput(processType) {
+            try {
+                const response = await fetch(`/api/clear/${processType}`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    document.getElementById(`${processType}-output`).textContent = '';
+                    document.getElementById(`${processType}-output-container`).style.display = 'none';
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Initial status check on page load
+        window.addEventListener('load', () => {
+            ['assignments', 'booking', 'llm'].forEach(processType => {
+                updateOutput(processType);
+            });
+        });
+    </script>
+</body>
+</html>
