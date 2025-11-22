@@ -14,7 +14,7 @@ body {
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
 }
 
@@ -22,7 +22,7 @@ body {
 header {
     text-align: center;
     color: white;
-    margin-bottom: 40px;
+    margin-bottom: 30px;
     padding: 20px;
 }
 
@@ -38,10 +38,71 @@ header h1 {
     opacity: 0.9;
 }
 
+/* Mode Toggle */
+.mode-toggle-container {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+.mode-toggle-btn {
+    padding: 15px 30px;
+    border: 3px solid white;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    backdrop-filter: blur(10px);
+}
+
+.mode-toggle-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+}
+
+.mode-toggle-btn.active {
+    background: white;
+    color: #667eea;
+    border-color: white;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.mode-icon {
+    font-size: 1.3rem;
+}
+
+/* Mode Content */
+.mode-content {
+    display: none;
+}
+
+.mode-content.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 /* Dashboard Grid */
 .dashboard {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
     gap: 25px;
     margin-bottom: 40px;
 }
@@ -70,10 +131,22 @@ header h1 {
 }
 
 .card-header h2 {
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     font-weight: 600;
 }
 
+.card-body {
+    padding: 25px;
+}
+
+.card-description {
+    color: #6b7280;
+    margin-bottom: 20px;
+    line-height: 1.6;
+    font-size: 0.95rem;
+}
+
+/* Status Badge */
 .status-badge {
     padding: 6px 12px;
     border-radius: 20px;
@@ -104,38 +177,54 @@ header h1 {
     }
 }
 
-.card-body {
-    padding: 25px;
-}
-
-.card-body p {
-    color: #6b7280;
-    margin-bottom: 20px;
-    line-height: 1.6;
-}
-
-/* Query Input Group */
-.query-input-group {
-    margin-bottom: 15px;
-}
-
-.query-input-group textarea {
-    width: 100%;
-    padding: 12px;
-    border: 2px solid #e5e7eb;
+/* Status Info (Admin Mode) */
+.status-info {
+    background: #f9fafb;
+    padding: 15px;
     border-radius: 8px;
-    font-family: inherit;
-    font-size: 0.95rem;
-    resize: vertical;
-    transition: border-color 0.3s ease;
+    margin-bottom: 20px;
 }
 
-.query-input-group textarea:focus {
-    outline: none;
-    border-color: #667eea;
+.status-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
 }
 
-/* Button Styles */
+.status-label {
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.status-row span:last-child {
+    color: #374151;
+}
+
+/* Config Display (Student Mode) */
+.config-display {
+    background: #f9fafb;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #e5e7eb;
+}
+
+.config-item {
+    padding: 8px 0;
+    color: #374151;
+}
+
+.config-item strong {
+    color: #667eea;
+    margin-right: 8px;
+}
+
+.config-error {
+    color: #ef4444;
+    font-style: italic;
+}
+
+/* Buttons */
 .btn {
     padding: 14px 28px;
     border: none;
@@ -147,6 +236,13 @@ header h1 {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+}
+
+.btn-large {
+    padding: 16px 32px;
+    font-size: 1.1rem;
+    width: 100%;
+    justify-content: center;
 }
 
 .btn-primary {
@@ -201,6 +297,133 @@ header h1 {
 .btn-clear:hover {
     background: #f3f4f6;
     border-color: #9ca3af;
+}
+
+/* Chat Input Section */
+.chat-input-section {
+    margin-bottom: 20px;
+}
+
+.chat-textarea {
+    width: 100%;
+    padding: 15px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+    margin-bottom: 15px;
+    transition: border-color 0.3s ease;
+}
+
+.chat-textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* History Section */
+.history-section {
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 2px solid #e5e7eb;
+}
+
+.section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 15px;
+}
+
+.history-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.history-empty {
+    text-align: center;
+    color: #9ca3af;
+    padding: 20px;
+    font-style: italic;
+}
+
+.history-item {
+    background: #f9fafb;
+    padding: 12px 15px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    border-left: 3px solid #667eea;
+    transition: all 0.2s ease;
+}
+
+.history-item:hover {
+    background: #f3f4f6;
+    transform: translateX(3px);
+}
+
+.history-time {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    margin-bottom: 5px;
+}
+
+.history-desc, .history-message {
+    color: #374151;
+    margin-bottom: 5px;
+}
+
+.history-category {
+    display: inline-block;
+    background: #667eea;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    margin-bottom: 5px;
+}
+
+.history-status {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.history-status.status-pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.history-status.status-confirmed, .history-status.status-received {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.history-status.status-completed {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+/* Query Input Group */
+.query-input-group {
+    margin-bottom: 15px;
+}
+
+.query-input-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+    transition: border-color 0.3s ease;
+}
+
+.query-input-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
 }
 
 /* AI Action Sections */
@@ -262,6 +485,8 @@ header h1 {
     max-height: 400px;
     overflow-y: auto;
     line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
 .output::-webkit-scrollbar {
@@ -299,13 +524,12 @@ footer {
         grid-template-columns: 1fr;
     }
 
-    .card {
-        margin-bottom: 20px;
+    .mode-toggle-container {
+        flex-direction: column;
     }
-}
 
-/* Success/Error Messages in Output */
-.output:has(text) {
-    white-space: pre-wrap;
-    word-wrap: break-word;
+    .mode-toggle-btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
