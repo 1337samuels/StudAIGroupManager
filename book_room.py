@@ -145,28 +145,58 @@ class RoomBooker:
             print('='*60)
             print(f"\n📱 Opening browser to: {initial_url}")
             print("\nPlease complete the following steps:")
-            print("  1. Enter your Microsoft credentials")
-            print("  2. Complete MFA (Microsoft Authenticator)")
-            print("  3. Wait for the page to fully load after login")
+            print("  1. Wait for Sign In button to be clicked automatically")
+            print("  2. Enter your Microsoft credentials")
+            print("  3. Complete MFA (Microsoft Authenticator)")
+            print("  4. Wait for the page to fully load after login")
             print(f"\nTimeout: {timeout} seconds")
             print('='*60)
 
             self.driver.get(initial_url)
+            time.sleep(3)  # Wait for initial page load
+
+            # Check if we're on the login page (with Sign In button)
+            print("\nChecking for 'Sign In' button...")
+            try:
+                sign_in_btn = WebDriverWait(self.driver, 5).until(
+                    EC.element_to_be_clickable((By.ID, "signInSignOut"))
+                )
+                # Check if the button says "Sign In" (not "Sign Out")
+                if "Sign In" in sign_in_btn.text:
+                    print("✓ Found 'Sign In' button - clicking to initiate Microsoft login...")
+                    sign_in_btn.click()
+                    time.sleep(2)
+                    print("✓ Redirecting to Microsoft login page...")
+                else:
+                    print("  Already signed in, skipping...")
+            except TimeoutException:
+                print("  No Sign In button found - might already be logged in or redirected")
+            except Exception as e:
+                print(f"  Note: Could not click Sign In button: {e}")
 
             start_time = time.time()
             check_interval = 2
 
-            print("\n⏳ Waiting for you to complete login...")
+            print("\n⏳ Waiting for you to complete Microsoft MFA login...")
 
             while (time.time() - start_time) < timeout:
                 try:
                     current_url = self.driver.current_url.lower()
 
+                    # Check if we're successfully logged in
                     if 'lbsmobile.london.edu' in current_url:
                         if not any(word in current_url for word in ['login', 'auth', 'microsoft', 'saml']):
-                            print("\n✓ Login successful!")
-                            print(f"  Current URL: {self.driver.current_url}")
-                            return True
+                            # Double-check we're actually logged in by looking for user elements
+                            try:
+                                # Check if the "My Bookings" button is visible (indicates logged in)
+                                my_bookings = self.driver.find_element(By.ID, "userBookings")
+                                if my_bookings.is_displayed() or my_bookings.value_of_css_property("display") != "none":
+                                    print("\n✓ Login successful!")
+                                    print(f"  Current URL: {self.driver.current_url}")
+                                    return True
+                            except:
+                                # If we can't find the button, wait a bit more
+                                pass
 
                     elapsed = int(time.time() - start_time)
                     if elapsed % 10 == 0 and elapsed > 0:
