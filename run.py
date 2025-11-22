@@ -670,123 +670,61 @@ class StudyGroupManager:
     # ==================== REPORT GENERATION ====================
 
     def generate_markdown_report(self, output_file='study_group_report.md'):
-        """Generate markdown report for LLM analysis"""
+        """Generate concise report for LLM analysis (minified format)"""
         print("\n" + "="*80)
-        print("STEP 5: GENERATE MARKDOWN REPORT")
+        print("STEP 5: GENERATE REPORT")
         print("="*80)
 
         report = []
-        report.append("# Study Group Planning Report")
-        report.append(f"\n*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n")
-        report.append("---\n")
 
-        # Section 1: Upcoming Assignments
-        report.append("## 📚 Upcoming Assignments (Next 14 Days)\n")
+        # Header - single line
+        report.append(f"REPORT {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        report.append("")
 
+        # Assignments - compact format
+        report.append("ASSIGNMENTS:")
         if not self.assignments:
-            report.append("*No assignments found in the next 14 days.*\n")
+            report.append("None")
         else:
-            # Group by date
-            by_date = {}
-            for assignment in self.assignments:
-                if 'due_datetime' in assignment:
-                    date_key = assignment['due_datetime'].strftime('%Y-%m-%d')
+            for item in self.assignments:
+                # Format: DATE TIME | COURSE | TYPE | TITLE
+                date_str = item['due_datetime'].strftime('%Y-%m-%d %H:%M')
+                course = item.get('course', 'Unknown')
+                item_type = item.get('type', 'Assignment')
+                title = item.get('title', 'Untitled')
+                report.append(f"{date_str} | {course} | {item_type} | {title}")
 
-                    if date_key not in by_date:
-                        by_date[date_key] = {
-                            'date': assignment['due_datetime'].strftime('%A, %d %B %Y'),
-                            'items': []
-                        }
-                    by_date[date_key]['items'].append(assignment)
+        report.append("")
 
-            # Output by date
-            for date_key in sorted(by_date.keys()):
-                date_info = by_date[date_key]
-                report.append(f"### {date_info['date']}\n")
-
-                for item in date_info['items']:
-                    course = item.get('course', 'Unknown Course')
-                    title = item.get('title', 'Untitled')
-                    item_type = item.get('type', 'Unknown')
-
-                    report.append(f"**{course}**")
-                    report.append(f"- **Type:** {item_type}")
-                    report.append(f"- **Title:** {title}")
-
-                    if 'due_date' in item:
-                        time_str = item['due_date'].split()[-1]
-                        report.append(f"- **Due:** {time_str}")
-
-                    if 'location' in item and item['location']:
-                        report.append(f"- **Location:** {item['location']}")
-
-                    if 'url' in item and item['url']:
-                        report.append(f"- **URL:** {item['url']}")
-
-                    report.append("")
-
-        # Section 2: Upcoming Events (Lectures/Classes)
-        report.append("\n---\n")
-        report.append("## 📅 Upcoming Events & Lectures (Next 14 Days)\n")
-
+        # Events - compact format
+        report.append("EVENTS:")
         if not self.events:
-            report.append("*No events found in the next 14 days.*\n")
+            report.append("None")
         else:
-            # Group by date
-            events_by_date = {}
-            for event in self.events:
-                if 'due_datetime' in event:
-                    date_key = event['due_datetime'].strftime('%Y-%m-%d')
+            for item in self.events:
+                # Format: DATE TIME | COURSE | TITLE
+                date_str = item['due_datetime'].strftime('%Y-%m-%d %H:%M')
+                course = item.get('course', 'Unknown')
+                title = item.get('title', 'Untitled')
+                report.append(f"{date_str} | {course} | {title}")
 
-                    if date_key not in events_by_date:
-                        events_by_date[date_key] = {
-                            'date': event['due_datetime'].strftime('%A, %d %B %Y'),
-                            'items': []
-                        }
-                    events_by_date[date_key]['items'].append(event)
+        report.append("")
 
-            # Output by date
-            for date_key in sorted(events_by_date.keys()):
-                date_info = events_by_date[date_key]
-                report.append(f"### {date_info['date']}\n")
-
-                for item in date_info['items']:
-                    course = item.get('course', 'Unknown Course')
-                    title = item.get('title', 'Untitled')
-
-                    report.append(f"**{course}**")
-                    report.append(f"- **Event:** {title}")
-
-                    if 'event_date' in item:
-                        time_str = item['event_date'].split()[-1]
-                        report.append(f"- **Time:** {time_str}")
-
-                    if 'location' in item and item['location']:
-                        report.append(f"- **Location:** {item['location']}")
-
-                    if 'url' in item and item['url']:
-                        report.append(f"- **URL:** {item['url']}")
-
-                    report.append("")
-
-        # Section 3: Study Group Members
-        report.append("\n---\n")
-        report.append("## 👥 Study Group Members\n")
-
+        # Members - compact format
+        report.append("MEMBERS:")
         if not self.study_group_members:
-            report.append("*No study group members found.*\n")
+            report.append("None")
         else:
-            report.append(f"**Total Members:** {len(self.study_group_members)}\n")
             for i, member in enumerate(self.study_group_members, 1):
-                report.append(f"{i}. **{member}**")
-
+                # Format: NAME | ORIGIN | EDUCATION | OCCUPATION
                 if member in self.member_details:
                     details = self.member_details[member]
-                    report.append(f"   - Origin: {details.get('origin', 'N/A')}")
-                    report.append(f"   - Education: {details.get('education', 'N/A')}")
-                    report.append(f"   - Previous Occupation: {details.get('previous_occupation', 'N/A')}")
-
-                report.append("")
+                    origin = details.get('origin', 'N/A')
+                    education = details.get('education', 'N/A')
+                    occupation = details.get('previous_occupation', 'N/A')
+                    report.append(f"{member} | {origin} | {education} | {occupation}")
+                else:
+                    report.append(f"{member} | N/A | N/A | N/A")
 
         # Write to file
         report_text = '\n'.join(report)
@@ -794,7 +732,9 @@ class StudyGroupManager:
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(report_text)
 
+        char_count = len(report_text)
         print(f"✓ Report generated: {output_file}")
+        print(f"✓ Report size: {char_count:,} characters (~{char_count//4:,} tokens)")
 
         return report_text
 
