@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LBS Study Group Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>LBS Study Group Manager</h1>
+            <p class="subtitle">Your AI-powered study group assistant</p>
+        </header>
+
+        <!-- Mode Toggle -->
+        <div class="mode-toggle-container">
+            <button class="mode-toggle-btn active" id="student-mode-btn" onclick="switchMode('student')">
+                <span class="mode-icon">👨‍🎓</span>
+                Student Mode
+            </button>
+            <button class="mode-toggle-btn" id="admin-mode-btn" onclick="switchMode('admin')">
+                <span class="mode-icon">🔗</span>
+                LBS Integrations Mode
+            </button>
+        </div>
+
+        <!-- STUDENT MODE -->
+        <div id="student-mode" class="mode-content active">
+            <div class="dashboard">
+                <!-- Work Allocation Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📅 Work Allocation & Scheduling</h2>
+                        <span class="status-badge" id="student-llm-status">Ready</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-description">Use this tool to help allocate tasks, schedule meetings, and manage room bookings with the group's AI scheduling agent.</p>
+
+                        <button class="btn btn-primary btn-large" onclick="requestAllocation()" id="request-allocation-btn">
+                            <span class="btn-icon">🗓️</span>
+                            Request Work Allocation
+                        </button>
+
+                        <div class="output-container" id="student-allocation-output" style="display: none;">
+                            <div class="output-header">
+                                <span class="output-title">AI Response (Preview)</span>
+                                <div class="output-actions">
+                                    <button class="btn-view" onclick="showFullResponse('student-llm-output')">📖 View Full Response</button>
+                                    <button class="btn-clear" onclick="clearOutput('llm')">Clear</button>
+                                </div>
+                            </div>
+                            <pre class="output output-preview" id="student-llm-output"></pre>
+                        </div>
+
+                        <div class="history-section">
+                            <h3 class="section-title">Request History</h3>
+                            <div class="history-list" id="allocation-history">
+                                <div class="history-empty">No previous requests</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Open Chat Inbox Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>💬 Open Chat Inbox</h2>
+                        <span class="status-badge" id="student-chat-status">Ready</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-description">Use this inbox to raise disputes, ask for advice, or send any questions to the group admins.</p>
+
+                        <div class="chat-input-section">
+                            <textarea
+                                id="student-chat-input"
+                                placeholder="Type your message here... (e.g., 'I have a conflict with the assigned task' or 'Can someone help me understand the requirements?')"
+                                rows="4"
+                                class="chat-textarea"
+                            ></textarea>
+                            <button class="btn btn-primary btn-large" onclick="sendChatMessage()" id="send-chat-btn">
+                                <span class="btn-icon">📤</span>
+                                Send Query
+                            </button>
+                        </div>
+
+                        <div class="output-container" id="student-chat-output" style="display: none;">
+                            <div class="output-header">
+                                <span class="output-title">AI Response (Preview)</span>
+                                <div class="output-actions">
+                                    <button class="btn-view" onclick="showFullResponse('student-chat-response')">📖 View Full Response</button>
+                                    <button class="btn-clear" onclick="clearStudentChatOutput()">Clear</button>
+                                </div>
+                            </div>
+                            <pre class="output output-preview" id="student-chat-response"></pre>
+                        </div>
+
+                        <div class="history-section">
+                            <h3 class="section-title">Previous Messages</h3>
+                            <div class="history-list" id="chat-history">
+                                <div class="history-empty">No previous messages</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- LBS INTEGRATIONS MODE -->
+        <div id="admin-mode" class="mode-content">
+            <div class="dashboard">
+                <!-- Assignment Extraction Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📚 Assignment Extraction</h2>
+                        <span class="status-badge" id="assignments-status">Ready</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-description">Extract assignments and study group information from learning.london.edu</p>
+
+                        <div class="status-info">
+                            <div class="status-row">
+                                <span class="status-label">Last run:</span>
+                                <span id="scraper-last-run">Never</span>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-label">Current status:</span>
+                                <span id="scraper-status">Idle</span>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" onclick="runAssignments()" id="assignments-btn">
+                            <span class="btn-icon">📚</span>
+                            Run Extraction
+                        </button>
+
+                        <div class="output-container" id="assignments-output-container" style="display: none;">
+                            <div class="output-header">
+                                <span class="output-title">Extraction Log</span>
+                                <button class="btn-clear" onclick="clearOutput('assignments')">Clear</button>
+                            </div>
+                            <pre class="output" id="assignments-output"></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Room Booking Card (Standalone) -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>🏢 Room Booking</h2>
+                        <span class="status-badge" id="booking-status">Ready</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-description">Book study rooms on lbsmobile.london.edu using configuration file</p>
+                        <button class="btn btn-primary" onclick="bookRoom()" id="booking-btn">
+                            <span class="btn-icon">🏢</span>
+                            Book Room
+                        </button>
+                        <div class="output-container" id="booking-output-container" style="display: none;">
+                            <div class="output-header">
+                                <span class="output-title">Booking Log</span>
+                                <button class="btn-clear" onclick="clearOutput('booking')">Clear</button>
+                            </div>
+                            <pre class="output" id="booking-output"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>LBS Study Group Manager © 2025</p>
+        </footer>
+
+        <!-- Full Response Modal -->
+        <div id="response-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>AI Response</h2>
+                    <button class="modal-close" onclick="closeModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="modal-response-text" class="modal-response"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="copyResponse()">📋 Copy to Clipboard</button>
+                    <button class="btn btn-primary" onclick="closeModal()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mode switching
+        let currentMode = 'student';
+        let allocationHistory = [];
+        let chatHistory = [];
+
+        function switchMode(mode) {
+            currentMode = mode;
+
+            // Update button states
+            document.getElementById('student-mode-btn').classList.toggle('active', mode === 'student');
+            document.getElementById('admin-mode-btn').classList.toggle('active', mode === 'admin');
+
+            // Update content visibility
+            document.getElementById('student-mode').classList.toggle('active', mode === 'student');
+            document.getElementById('admin-mode').classList.toggle('active', mode === 'admin');
+
+            // Load student config if switching to student mode
+            if (mode === 'student') {
+                loadStudentConfig();
+            }
+        }
+
+        // Load room booking config for student view
+        async function loadStudentConfig() {
+            try {
+                const response = await fetch('/room_booking_config.json');
+                if (response.ok) {
+                    const config = await response.json();
+                    const display = document.getElementById('student-config-display');
+                    display.innerHTML = `
+                        <div class="config-item"><strong>Date:</strong> ${config.booking_date}</div>
+                        <div class="config-item"><strong>Time:</strong> ${config.start_time}</div>
+                        <div class="config-item"><strong>Duration:</strong> ${config.duration_hours} hours</div>
+                        <div class="config-item"><strong>Building:</strong> ${config.building}</div>
+                        <div class="config-item"><strong>Group:</strong> ${config.study_group_name}</div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('student-config-display').innerHTML = '<div class="config-error">Configuration not available</div>';
+            }
+        }
+
+        // Student Mode Functions
+        function requestAllocation() {
+            // Reuse the plan week functionality
+            const btn = document.getElementById('request-allocation-btn');
+            const status = document.getElementById('student-llm-status');
+            const outputContainer = document.getElementById('student-allocation-output');
+            const output = document.getElementById('student-llm-output');
+
+            btn.disabled = true;
+            status.textContent = 'Running...';
+            status.className = 'status-badge status-running';
+            outputContainer.style.display = 'block';
+            output.textContent = 'Planning your week with AI...\n';
+
+            fetch('/api/plan-week', {
+                method: 'POST'
+            }).then(response => {
+                if (response.ok) {
+                    startPolling('llm');
+                    addAllocationHistory();
+                } else {
+                    handleError(response, output);
+                    btn.disabled = false;
+                    status.textContent = 'Error';
+                    status.className = 'status-badge status-error';
+                }
+            }).catch(error => {
+                output.textContent = 'Error: ' + error.message;
+                btn.disabled = false;
+                status.textContent = 'Error';
+                status.className = 'status-badge status-error';
+            });
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('student-chat-input');
+            const query = input.value.trim();
+
+            if (!query) {
+                alert('Please enter a message');
+                return;
+            }
+
+            const btn = document.getElementById('send-chat-btn');
+            const status = document.getElementById('student-chat-status');
+            const outputContainer = document.getElementById('student-chat-output');
+            const output = document.getElementById('student-chat-response');
+
+            btn.disabled = true;
+            status.textContent = 'Sending...';
+            status.className = 'status-badge status-running';
+            outputContainer.style.display = 'block';
+            output.textContent = 'Processing your message...\n';
+
+            fetch('/api/query-llm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: query })
+            }).then(response => {
+                if (response.ok) {
+                    startPolling('llm', true);
+                    addChatHistory(query);
+                } else {
+                    handleError(response, output);
+                    btn.disabled = false;
+                    status.textContent = 'Error';
+                    status.className = 'status-badge status-error';
+                }
+            }).catch(error => {
+                output.textContent = 'Error: ' + error.message;
+                btn.disabled = false;
+                status.textContent = 'Error';
+                status.className = 'status-badge status-error';
+            });
+        }
+
+        function studentBookRoom() {
+            const btn = document.getElementById('student-booking-btn');
+            const status = document.getElementById('student-booking-status');
+            const outputContainer = document.getElementById('student-booking-output');
+            const output = document.getElementById('student-booking-response');
+
+            btn.disabled = true;
+            status.textContent = 'Booking...';
+            status.className = 'status-badge status-running';
+            outputContainer.style.display = 'block';
+            output.textContent = 'Starting room booking...\n';
+
+            fetch('/api/book-room', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            }).then(response => {
+                if (response.ok) {
+                    startPolling('booking', false, true);
+                } else {
+                    handleError(response, output);
+                    btn.disabled = false;
+                    status.textContent = 'Error';
+                    status.className = 'status-badge status-error';
+                }
+            }).catch(error => {
+                output.textContent = 'Error: ' + error.message;
+                btn.disabled = false;
+                status.textContent = 'Error';
+                status.className = 'status-badge status-error';
+            });
+        }
+
+        function addAllocationHistory() {
+            const now = new Date();
+            allocationHistory.unshift({
+                time: now.toLocaleString(),
+                description: 'Work allocation request',
+                status: 'Pending'
+            });
+            updateAllocationHistory();
+        }
+
+        function addChatHistory(message) {
+            const now = new Date();
+            chatHistory.unshift({
+                time: now.toLocaleString(),
+                message: message.substring(0, 50) + (message.length > 50 ? '...' : ''),
+                category: 'Question',
+                status: 'Received'
+            });
+            updateChatHistory();
+        }
+
+        function updateAllocationHistory() {
+            const container = document.getElementById('allocation-history');
+            if (allocationHistory.length === 0) {
+                container.innerHTML = '<div class="history-empty">No previous requests</div>';
+            } else {
+                container.innerHTML = allocationHistory.map(item => `
+                    <div class="history-item">
+                        <div class="history-time">${item.time}</div>
+                        <div class="history-desc">${item.description}</div>
+                        <div class="history-status status-${item.status.toLowerCase()}">${item.status}</div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function updateChatHistory() {
+            const container = document.getElementById('chat-history');
+            if (chatHistory.length === 0) {
+                container.innerHTML = '<div class="history-empty">No previous messages</div>';
+            } else {
+                container.innerHTML = chatHistory.map(item => `
+                    <div class="history-item">
+                        <div class="history-time">${item.time}</div>
+                        <div class="history-category">${item.category}</div>
+                        <div class="history-message">${item.message}</div>
+                        <div class="history-status status-${item.status.toLowerCase()}">${item.status}</div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function clearStudentChatOutput() {
+            document.getElementById('student-chat-output').style.display = 'none';
+            document.getElementById('student-chat-response').textContent = '';
+            document.getElementById('student-chat-input').value = '';
+        }
+
+        function clearStudentBookingOutput() {
+            document.getElementById('student-booking-output').style.display = 'none';
+            document.getElementById('student-booking-response').textContent = '';
+        }
+
+        // Polling intervals
+        let pollIntervals = {};
+
+        // Admin Mode Functions - Assignment Extraction
+        async function runAssignments() {
+            const btn = document.getElementById('assignments-btn');
+            const status = document.getElementById('assignments-status');
+            const outputContainer = document.getElementById('assignments-output-container');
+            const output = document.getElementById('assignments-output');
+
+            btn.disabled = true;
+            status.textContent = 'Running...';
+            status.className = 'status-badge status-running';
+            document.getElementById('scraper-status').textContent = 'Running';
+            outputContainer.style.display = 'block';
+            output.textContent = 'Starting assignment extraction...\n';
+
+            try {
+                const response = await fetch('/api/run-assignments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                if (response.ok) {
+                    startPolling('assignments');
+                } else {
+                    await handleError(response, output);
+                    btn.disabled = false;
+                    status.textContent = 'Error';
+                    status.className = 'status-badge status-error';
+                    document.getElementById('scraper-status').textContent = 'Error';
+                }
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                btn.disabled = false;
+                status.textContent = 'Error';
+                status.className = 'status-badge status-error';
+                document.getElementById('scraper-status').textContent = 'Error';
+            }
+        }
+
+        // Admin Mode - Room Booking
+        async function bookRoom() {
+            const btn = document.getElementById('booking-btn');
+            const status = document.getElementById('booking-status');
+            const outputContainer = document.getElementById('booking-output-container');
+            const output = document.getElementById('booking-output');
+
+            btn.disabled = true;
+            status.textContent = 'Running...';
+            status.className = 'status-badge status-running';
+            outputContainer.style.display = 'block';
+            output.textContent = 'Starting room booking...\n';
+
+            try {
+                const response = await fetch('/api/book-room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                if (response.ok) {
+                    startPolling('booking');
+                } else {
+                    await handleError(response, output);
+                    btn.disabled = false;
+                    status.textContent = 'Error';
+                    status.className = 'status-badge status-error';
+                }
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                btn.disabled = false;
+                status.textContent = 'Error';
+                status.className = 'status-badge status-error';
+            }
+        }
+
+        // Admin Mode - Plan Week
+        async function planWeek() {
+            const btn = document.getElementById('plan-week-btn');
+            const llmBtn = document.getElementById('llm-btn');
+            const status = document.getElementById('llm-status');
+            const outputContainer = document.getElementById('llm-output-container');
+            const output = document.getElementById('llm-output');
+
+            btn.disabled = true;
+            llmBtn.disabled = true;
+            status.textContent = 'Running...';
+            status.className = 'status-badge status-running';
+            outputContainer.style.display = 'block';
+            output.textContent = 'Planning your week with AI...\n';
+
+            try {
+                const response = await fetch('/api/plan-week', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    startPolling('llm');
+                } else {
+                    await handleError(response, output);
+                    btn.disabled = false;
+                    llmBtn.disabled = false;
+                    status.textContent = 'Error';
+                    status.className = 'status-badge status-error';
+                }
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                btn.disabled = false;
+                llmBtn.disabled = false;
+                status.textContent = 'Error';
+                status.className = 'status-badge status-error';
+            }
+        }
+
+        // Admin Mode - Custom Query
+        async function queryLLM() {
+            const btn = document.getElementById('llm-btn');
+            const planBtn = document.getElementById('plan-week-btn');
+            const status = document.getElementById('llm-status');
+            const outputContainer = document.getElementById('llm-output-container');
+            const output = document.getElementById('llm-output');
+            const queryInput = document.getElementById('llm-query');
+            const query = queryInput.value.trim();
+
+            if (!query) {
+                alert('Please enter a query');
+                return;
+            }
+
+            btn.disabled = true;
+            planBtn.disabled = true;
+            status.textContent = 'Running...';
+            status.className = 'status-badge status-running';
+            outputContainer.style.display = 'block';
+            output.textContent = 'Processing query...\n';
+
+            try {
+                const response = await fetch('/api/query-llm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+
+                if (response.ok) {
+                    startPolling('llm');
+                } else {
+                    await handleError(response, output);
+                    btn.disabled = false;
+                    planBtn.disabled = false;
+                    status.textContent = 'Error';
+                    status.className = 'status-badge status-error';
+                }
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                btn.disabled = false;
+                planBtn.disabled = false;
+                status.textContent = 'Error';
+                status.className = 'status-badge status-error';
+            }
+        }
+
+        // Polling and update functions
+        function startPolling(processType, isChat = false, isStudentBooking = false) {
+            if (pollIntervals[processType]) {
+                clearInterval(pollIntervals[processType]);
+            }
+
+            pollIntervals[processType] = setInterval(() => {
+                updateOutput(processType, isChat, isStudentBooking);
+            }, 1000);
+        }
+
+        async function updateOutput(processType, isChat = false, isStudentBooking = false) {
+            try {
+                const response = await fetch(`/api/output/${processType}`);
+                const data = await response.json();
+
+                // Determine which output element to update based on mode
+                let output, status;
+
+                if (currentMode === 'student') {
+                    if (processType === 'llm' && isChat) {
+                        output = document.getElementById('student-chat-response');
+                        status = document.getElementById('student-chat-status');
+                    } else if (processType === 'booking' || isStudentBooking) {
+                        output = document.getElementById('student-booking-response');
+                        status = document.getElementById('student-booking-status');
+                    } else {
+                        output = document.getElementById('student-llm-output');
+                        status = document.getElementById('student-llm-status');
+                    }
+                } else {
+                    output = document.getElementById(`${processType}-output`);
+                    status = document.getElementById(`${processType}-status`);
+                }
+
+                if (output) {
+                    output.textContent = data.output;
+                    output.scrollTop = output.scrollHeight;
+                }
+
+                if (data.running) {
+                    if (status) {
+                        status.textContent = 'Running...';
+                        status.className = 'status-badge status-running';
+                    }
+                    if (processType === 'assignments') {
+                        document.getElementById('scraper-status').textContent = 'Running';
+                    }
+                } else {
+                    if (status) {
+                        status.textContent = 'Ready';
+                        status.className = 'status-badge status-ready';
+                    }
+
+                    // Re-enable buttons
+                    if (currentMode === 'student') {
+                        if (isChat) {
+                            document.getElementById('send-chat-btn').disabled = false;
+                        } else if (isStudentBooking) {
+                            document.getElementById('student-booking-btn').disabled = false;
+                        } else {
+                            // Allocation completed
+                            document.getElementById('request-allocation-btn').disabled = false;
+
+                            // Only auto-trigger room booking for allocation requests (not chat)
+                            // AND only if the process actually completed (check for completion message)
+                            if (processType === 'llm' && !isChat && data.output &&
+                                (data.output.includes('✓ Planning completed!') || data.output.includes('✗ Error:'))) {
+                                console.log('Allocation completed successfully!');
+
+                                // Check if the output contains the success message for JSON extraction
+                                if (data.output.includes('✓ Extracted and saved room booking configuration')) {
+                                    console.log('Booking config found, auto-triggering room booking...');
+                                    setTimeout(() => {
+                                        studentBookRoom();
+                                    }, 500);
+                                }
+
+                                // Show "View Weekly Plan" button
+                                const outputContainer = document.getElementById('student-allocation-output');
+                                let viewPlanBtn = document.getElementById('view-weekly-plan-btn');
+
+                                if (!viewPlanBtn) {
+                                    viewPlanBtn = document.createElement('button');
+                                    viewPlanBtn.id = 'view-weekly-plan-btn';
+                                    viewPlanBtn.className = 'btn btn-primary btn-large';
+                                    viewPlanBtn.style.marginTop = '15px';
+                                    viewPlanBtn.innerHTML = '<span class="btn-icon">📊</span> View Weekly Plan Dashboard';
+                                    viewPlanBtn.onclick = () => {
+                                        window.location.href = '/weekly-plan';
+                                    };
+                                    outputContainer.appendChild(viewPlanBtn);
+                                }
+                            }
+                        }
+                    } else {
+                        if (processType === 'llm') {
+                            document.getElementById('llm-btn').disabled = false;
+                            document.getElementById('plan-week-btn').disabled = false;
+                        } else if (processType === 'assignments') {
+                            document.getElementById('assignments-btn').disabled = false;
+                            document.getElementById('scraper-status').textContent = 'Completed';
+                            document.getElementById('scraper-last-run').textContent = new Date().toLocaleString();
+                        } else if (processType === 'booking') {
+                            document.getElementById('booking-btn').disabled = false;
+                        }
+                    }
+
+                    clearInterval(pollIntervals[processType]);
+                }
+            } catch (error) {
+                console.error('Error updating output:', error);
+            }
+        }
+
+        async function clearOutput(processType) {
+            try {
+                const response = await fetch(`/api/clear/${processType}`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    document.getElementById(`${processType}-output`).textContent = '';
+                    document.getElementById(`${processType}-output-container`).style.display = 'none';
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function handleError(response, output) {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const data = await response.json();
+                output.textContent = 'Error: ' + data.error;
+            } else {
+                const text = await response.text();
+                output.textContent = 'Server Error: ' + response.status + '\n' + text.substring(0, 500);
+            }
+        }
+
+        // Modal functions
+        function showFullResponse(outputId) {
+            const output = document.getElementById(outputId);
+            const modal = document.getElementById('response-modal');
+            const modalText = document.getElementById('modal-response-text');
+
+            if (output && modal && modalText) {
+                modalText.textContent = output.textContent;
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden'; // Prevent background scrolling
+            }
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('response-modal');
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto'; // Restore scrolling
+        }
+
+        function copyResponse() {
+            const modalText = document.getElementById('modal-response-text');
+            navigator.clipboard.writeText(modalText.textContent).then(() => {
+                alert('Response copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+            });
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('response-modal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            loadStudentConfig();
+            ['assignments', 'booking', 'llm'].forEach(processType => {
+                updateOutput(processType);
+            });
+        });
+    </script>
+</body>
+</html>

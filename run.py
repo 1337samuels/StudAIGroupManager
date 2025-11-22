@@ -26,6 +26,7 @@ class StudyGroupManager:
         self.driver = None
         self.cookies = {}
         self.assignments = []
+        self.events = []  # Separate list for calendar events
         self.study_group_members = []
         self.member_details = {}
 
@@ -244,113 +245,144 @@ class StudyGroupManager:
     # ==================== ASSIGNMENTS EXTRACTION ====================
 
     def extract_assignments_from_dashboard(self):
-        """Navigate to dashboard and extract upcoming assignments"""
+        """Navigate to Calendar Agenda and extract upcoming assignments and events"""
         print("\n" + "="*80)
-        print("STEP 2: EXTRACT UPCOMING ASSIGNMENTS")
+        print("STEP 2: EXTRACT UPCOMING ASSIGNMENTS AND EVENTS")
         print("="*80)
 
-        def navigate_to_dashboard():
-            print("\nNavigating to dashboard...")
-            self.driver.get("https://learning.london.edu")
-            time.sleep(2)
+        def navigate_to_calendar_agenda():
+            print("\nNavigating to Calendar Agenda view...")
+            self.driver.get("https://learning.london.edu/calendar#view_name=agenda")
+            time.sleep(3)
             return True
 
-        self.smart_wait_and_retry(navigate_to_dashboard)
+        self.smart_wait_and_retry(navigate_to_calendar_agenda)
 
-        # Wait for planner items to load
-        print("Waiting for dashboard content to load...")
-        time.sleep(5)
+        # Wait for agenda items to load
+        print("Waiting for calendar agenda to load...")
+        time.sleep(4)
 
         # Get page source and parse
         html = self.driver.page_source
         soup = BeautifulSoup(html, 'html.parser')
 
-        # Find all planner items
-        planner_items = soup.find_all('div', {'data-testid': 'planner-item-raw'})
-        print(f"Found {len(planner_items)} planner items")
+        # Find all agenda days and items
+        agenda_items = soup.find_all('li', class_='agenda-event__item')
+        print(f"Found {len(agenda_items)} agenda items")
 
-        # Parse assignments
+        # Parse assignments and events
         today = datetime.now()
-        next_week = today + timedelta(days=7)
+        two_weeks = today + timedelta(days=14)
 
-        for item in planner_items:
-            assignment = {}
+        # Use sets to track unique items and avoid duplicates
+        seen_assignments = set()
+        seen_events = set()
 
-            # Extract course and type
-            type_span = item.find('span', class_=lambda x: x and 'css-65c5ma-text' in x)
-            if type_span:
-                full_type = type_span.get_text(strip=True)
-                parts = full_type.rsplit(' ', 1)
-                if len(parts) == 2:
-                    assignment['course'] = parts[0]
-                    assignment['type'] = parts[1]
+        # Track current date context
+        current_date = None
 
-            # Extract title and due date
-            # Note: There are multiple screenReader spans - one for checkbox, one for actual data
-            # We need the one with date information (contains "due" or "at")
-            sr_spans = item.find_all('span', class_='css-r9cwls-screenReaderContent')
-            sr_text = None
-            for span in sr_spans:
-                text = span.get_text(strip=True)
-                if 'due' in text.lower() or 'at' in text.lower():
-                    sr_text = text
-                    break
+        for item in agenda_items:
+            try:
+                # Check if there's a preceding agenda-date element (find parent structure)
+                parent = item.find_parent('div', class_='agenda-event__container')
+                if parent:
+                    date_div = parent.find_previous_sibling('div', class_='agenda-day')
+                    if date_div:
+                        date_elem = date_div.find('h3', class_='agenda-date')
+                        if date_elem:
+                            # Extract date from aria-hidden span (e.g., "Tue, 25 Nov")
+                            date_text = date_elem.find('span', {'aria-hidden': 'true'})
+                            if date_text:
+                                current_date = date_text.get_text(strip=True)
 
-            if sr_text:
-                # Extract title
-                title_match = re.match(r'^(.*?),', sr_text)
-                if title_match:
-                    assignment['title'] = title_match.group(1).replace('Quiz ', '').replace('Assignment ', '').replace('Calendar event ', '')
+                # Determine type by icon class
+                icon = item.find('i')
+                is_assignment = icon and 'icon-assignment' in icon.get('class', [])
+                is_quiz = icon and 'icon-quiz' in icon.get('class', [])
+                is_event = icon and 'icon-calendar-month' in icon.get('class', [])
 
-                # Extract due date
-                if 'due' in sr_text.lower():
-                    match = re.search(r'due\s+(\w+),\s+(\d+\s+\w+\s+\d{4})\s+(\d{2}:\d{2})', sr_text, re.IGNORECASE)
-                    if match:
-                        day_name, date_str, time_str = match.groups()
-                        assignment['due_date'] = f"{date_str} {time_str}"
-                        assignment['due_day'] = day_name
+                # Extract title from agenda-event__title span
+                title_elem = item.find('span', class_='agenda-event__title')
+                title = title_elem.get_text(strip=True) if title_elem else 'Untitled'
 
-                        try:
-                            due_datetime = datetime.strptime(assignment['due_date'], "%d %B %Y %H:%M")
-                            assignment['due_datetime'] = due_datetime
-                        except:
-                            pass
-                elif 'at' in sr_text.lower():
-                    match = re.search(r'at\s+(\w+),\s+(\d+\s+\w+\s+\d{4})\s+(\d{2}:\d{2})', sr_text, re.IGNORECASE)
-                    if match:
-                        day_name, date_str, time_str = match.groups()
-                        assignment['event_date'] = f"{date_str} {time_str}"
-                        assignment['event_day'] = day_name
+                # Extract time from agenda-event__time div
+                time_elem = item.find('div', class_='agenda-event__time')
+                time_str = time_elem.get_text(strip=True) if time_elem else None
 
-                        try:
-                            event_datetime = datetime.strptime(assignment['event_date'], "%d %B %Y %H:%M")
-                            assignment['due_datetime'] = event_datetime
-                        except:
-                            pass
+                # Extract course from screenreader text containing "Calendar"
+                course = 'Unknown Course'
+                screenreader_spans = item.find_all('span', class_='screenreader-only')
+                for span in screenreader_spans:
+                    text = span.get_text(strip=True)
+                    if text.startswith('Calendar '):
+                        # Format: "Calendar C111   AUT25 Finance I"
+                        course = text.replace('Calendar ', '').strip()
+                        break
 
-            # Extract location
-            location_div = item.find('div', class_='PlannerItem-styles__location')
-            if location_div:
-                location_span = location_div.find('span')
-                if location_span:
-                    assignment['location'] = location_span.get_text(strip=True)
+                # Parse datetime
+                if not current_date or not time_str:
+                    continue
 
-            # Extract URL
-            link = item.find('a', href=True)
-            if link:
-                assignment['url'] = link['href']
+                # Clean time string (e.g., "Due 16:00" -> "16:00" or "16:00" -> "16:00")
+                time_clean = time_str.replace('Due ', '').replace('Starts at ', '').strip()
 
-            # Filter - only upcoming Assignment items (exclude calendar events)
-            if 'due_datetime' in assignment and 'type' in assignment:
-                # Only include Assignment and Quiz types, exclude calendar events
-                if assignment['type'] in ['Assignment', 'Quiz']:
-                    if today <= assignment['due_datetime'] <= next_week:
-                        self.assignments.append(assignment)
+                # Parse date (e.g., "Tue, 25 Nov" with current year)
+                try:
+                    # Add current year to the date string
+                    current_year = datetime.now().year
+                    date_with_year = f"{current_date} {current_year}"
+                    # Parse format: "Tue, 25 Nov 2025"
+                    date_obj = datetime.strptime(date_with_year, "%a, %d %b %Y")
+                    # Combine with time
+                    time_obj = datetime.strptime(time_clean, "%H:%M").time()
+                    event_datetime = datetime.combine(date_obj.date(), time_obj)
+                except Exception as e:
+                    print(f"  Warning: Could not parse date/time: {current_date} {time_clean} - {e}")
+                    continue
 
-        print(f"✓ Found {len(self.assignments)} upcoming assignments")
+                # Skip if outside our range
+                if not (today <= event_datetime <= two_weeks):
+                    continue
 
-        # Sort by due date
+                # Create unique identifier to detect duplicates
+                unique_id = f"{title}|{event_datetime.strftime('%Y-%m-%d %H:%M')}|{course}"
+
+                # Categorize and add to appropriate list (avoiding duplicates)
+                if (is_assignment or is_quiz) and unique_id not in seen_assignments:
+                    seen_assignments.add(unique_id)
+                    self.assignments.append({
+                        'title': title,
+                        'course': course,
+                        'type': 'Quiz' if is_quiz else 'Assignment',
+                        'due_date': event_datetime.strftime("%d %B %Y %H:%M"),
+                        'due_day': event_datetime.strftime("%A"),
+                        'due_datetime': event_datetime,
+                        'location': '',  # Location not in agenda view
+                        'url': ''  # URL extraction would need data-event-id lookup
+                    })
+                elif is_event and unique_id not in seen_events:
+                    seen_events.add(unique_id)
+                    self.events.append({
+                        'title': title,
+                        'course': course,
+                        'type': 'Event',
+                        'event_date': event_datetime.strftime("%d %B %Y %H:%M"),
+                        'event_day': event_datetime.strftime("%A"),
+                        'due_datetime': event_datetime,  # For sorting
+                        'location': '',  # Location not in agenda view
+                        'url': ''  # URL extraction would need data-event-id lookup
+                    })
+
+            except Exception as e:
+                print(f"  Warning: Error parsing agenda item: {e}")
+                continue
+
+        print(f"✓ Found {len(self.assignments)} unique assignments")
+        print(f"✓ Found {len(self.events)} unique events")
+
+        # Sort both lists by date
         self.assignments.sort(key=lambda x: x.get('due_datetime', datetime.max))
+        self.events.sort(key=lambda x: x.get('due_datetime', datetime.max))
 
         return True
 
@@ -464,7 +496,7 @@ class StudyGroupManager:
 
         # Wait for iframe to load and switch to it
         print("Waiting for Class List iframe to load...")
-        time.sleep(8)  # Give iframe content time to load
+        time.sleep(3)  # Reduced from 8 to 3 seconds
 
         # Try to switch to iframe
         try:
@@ -474,7 +506,7 @@ class StudyGroupManager:
             for iframe in iframes:
                 try:
                     self.driver.switch_to.frame(iframe)
-                    time.sleep(2)
+                    time.sleep(1)  # Reduced from 2 to 1 second
 
                     # Try to click the "Students" tab/button to load student data
                     print("  Looking for Students tab...")
@@ -515,7 +547,7 @@ class StudyGroupManager:
                         if students_button:
                             print("  ✓ Clicking Students button...")
                             students_button.click()
-                            time.sleep(5)  # Wait for student data to load
+                            time.sleep(2)  # Reduced from 5 to 2 seconds
                             print("  ✓ Students data should now be loaded")
                         else:
                             print("  ⚠ Students button not found, trying to proceed anyway...")
@@ -638,106 +670,61 @@ class StudyGroupManager:
     # ==================== REPORT GENERATION ====================
 
     def generate_markdown_report(self, output_file='study_group_report.md'):
-        """Generate markdown report for LLM analysis"""
+        """Generate concise report for LLM analysis (minified format)"""
         print("\n" + "="*80)
-        print("STEP 5: GENERATE MARKDOWN REPORT")
+        print("STEP 5: GENERATE REPORT")
         print("="*80)
 
         report = []
-        report.append("# Study Group Planning Report")
-        report.append(f"\n*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n")
-        report.append("---\n")
 
-        # Section 1: Upcoming Assignments
-        report.append("## 📚 Upcoming Assignments (Next 7 Days)\n")
+        # Header - single line
+        report.append(f"REPORT {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        report.append("")
 
+        # Assignments - compact format
+        report.append("ASSIGNMENTS:")
         if not self.assignments:
-            report.append("*No assignments found in the next 7 days.*\n")
+            report.append("None")
         else:
-            # Group by date
-            by_date = {}
-            for assignment in self.assignments:
-                if 'due_datetime' in assignment:
-                    date_key = assignment['due_datetime'].strftime('%Y-%m-%d')
+            for item in self.assignments:
+                # Format: DATE TIME | COURSE | TYPE | TITLE
+                date_str = item['due_datetime'].strftime('%Y-%m-%d %H:%M')
+                course = item.get('course', 'Unknown')
+                item_type = item.get('type', 'Assignment')
+                title = item.get('title', 'Untitled')
+                report.append(f"{date_str} | {course} | {item_type} | {title}")
 
-                    if date_key not in by_date:
-                        by_date[date_key] = {
-                            'date': assignment['due_datetime'].strftime('%A, %d %B %Y'),
-                            'items': []
-                        }
-                    by_date[date_key]['items'].append(assignment)
+        report.append("")
 
-            # Output by date
-            for date_key in sorted(by_date.keys()):
-                date_info = by_date[date_key]
-                report.append(f"### {date_info['date']}\n")
+        # Events - compact format
+        report.append("EVENTS:")
+        if not self.events:
+            report.append("None")
+        else:
+            for item in self.events:
+                # Format: DATE TIME | COURSE | TITLE
+                date_str = item['due_datetime'].strftime('%Y-%m-%d %H:%M')
+                course = item.get('course', 'Unknown')
+                title = item.get('title', 'Untitled')
+                report.append(f"{date_str} | {course} | {title}")
 
-                for item in date_info['items']:
-                    course = item.get('course', 'Unknown Course')
-                    title = item.get('title', 'Untitled')
-                    item_type = item.get('type', 'Unknown')
+        report.append("")
 
-                    report.append(f"**{course}**")
-                    report.append(f"- **Type:** {item_type}")
-                    report.append(f"- **Title:** {title}")
-
-                    if 'due_date' in item:
-                        time_str = item['due_date'].split()[-1]
-                        report.append(f"- **Due:** {time_str}")
-                    elif 'event_date' in item:
-                        time_str = item['event_date'].split()[-1]
-                        report.append(f"- **Time:** {time_str}")
-
-                    if 'location' in item:
-                        report.append(f"- **Location:** {item['location']}")
-
-                    if 'url' in item:
-                        report.append(f"- **URL:** {item['url']}")
-
-                    report.append("")
-
-        # Section 2: Study Group Members
-        report.append("\n---\n")
-        report.append("## 👥 Study Group Members\n")
-
+        # Members - compact format
+        report.append("MEMBERS:")
         if not self.study_group_members:
-            report.append("*No study group members found.*\n")
+            report.append("None")
         else:
-            report.append(f"**Total Members:** {len(self.study_group_members)}\n")
             for i, member in enumerate(self.study_group_members, 1):
-                report.append(f"{i}. **{member}**")
-
+                # Format: NAME | ORIGIN | EDUCATION | OCCUPATION
                 if member in self.member_details:
                     details = self.member_details[member]
-                    report.append(f"   - Origin: {details.get('origin', 'N/A')}")
-                    report.append(f"   - Education: {details.get('education', 'N/A')}")
-                    report.append(f"   - Previous Occupation: {details.get('previous_occupation', 'N/A')}")
-
-                report.append("")
-
-        # Section 3: LLM Prompt
-        report.append("\n---\n")
-        report.append("## 🤖 Analysis Request for LLM\n")
-        report.append("""
-Please analyze the upcoming assignments and study group member profiles above, and provide:
-
-1. **Task Allocation Strategy**: Based on each member's background (education, origin, previous occupation),
-   suggest which members would be best suited for each assignment. Consider:
-   - Technical vs. analytical vs. creative tasks
-   - Subject matter expertise from previous roles
-   - Educational background relevance
-   - Complementary skill combinations
-
-2. **Workload Distribution**: Ensure fair distribution of work across all members
-
-3. **Collaboration Recommendations**: Suggest which assignments benefit from paired/group work vs. individual work
-
-4. **Timeline Planning**: Identify potential scheduling conflicts and recommend prioritization
-
-5. **Strengths Mapping**: Create a quick reference showing each member's key strengths relevant to these assignments
-
-Please provide actionable recommendations that the study group can implement immediately.
-""")
+                    origin = details.get('origin', 'N/A')
+                    education = details.get('education', 'N/A')
+                    occupation = details.get('previous_occupation', 'N/A')
+                    report.append(f"{member} | {origin} | {education} | {occupation}")
+                else:
+                    report.append(f"{member} | N/A | N/A | N/A")
 
         # Write to file
         report_text = '\n'.join(report)
@@ -745,7 +732,9 @@ Please provide actionable recommendations that the study group can implement imm
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(report_text)
 
+        char_count = len(report_text)
         print(f"✓ Report generated: {output_file}")
+        print(f"✓ Report size: {char_count:,} characters (~{char_count//4:,} tokens)")
 
         return report_text
 
@@ -781,8 +770,8 @@ Please provide actionable recommendations that the study group can implement imm
             print("\nReport saved to: study_group_report.md")
             print("You can now upload this file to an LLM for analysis and recommendations.")
 
-            # Keep browser open for inspection
-            input("\n\nPress Enter to close browser and exit...")
+            # Auto-close when run from web UI (no user input needed)
+            # input("\n\nPress Enter to close browser and exit...")
 
             return True
 

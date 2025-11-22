@@ -1,10 +1,13 @@
 # LBS StudAI Group Manager
 
-One-click automation to analyze your study group and upcoming assignments.
+Comprehensive automation suite for LBS students - assignment extraction, room booking, and AI assistance.
 
 ## What It Does
 
-This tool automatically:
+This tool provides a **web UI dashboard** with three main features:
+
+### 📚 Assignment Extraction
+Automatically:
 1. ✅ Logs into learning.london.edu (restores saved session if available)
 2. ✅ Extracts your upcoming assignments (next 7 days)
 3. ✅ Finds your Study Group members
@@ -17,6 +20,19 @@ This tool automatically:
 - Collaboration strategies
 - Timeline planning
 
+### 🏢 Room Booking
+Automatically:
+1. ✅ Logs into lbsmobile.london.edu with Microsoft MFA
+2. ✅ Navigates to room booking system
+3. ✅ Fills in booking details from configuration file
+4. ✅ Selects first available room matching criteria
+5. ✅ Completes the booking process
+
+**Configuration:** JSON file with date, time, duration, attendees, and building preference
+
+### 🤖 LBS AI Assistant
+Query LBS's AI platform for analysis (API integration coming soon)
+
 ## Quick Start
 
 ### Installation
@@ -28,20 +44,39 @@ pip install -r requirements.txt
 # Ensure Chrome is installed (ChromeDriver auto-managed)
 ```
 
-### Run It
+### Option 1: Web UI (Recommended)
 
-**That's it - just ONE command:**
+**Launch the web interface for easy access to all features:**
 
 ```bash
-python run.py
+python app.py
 ```
 
-The script will:
+Then open your browser to: **http://localhost:5000**
+
+The web UI provides:
+- 📚 **Assignment Extraction** - One-click extraction from learning.london.edu
+- 🏢 **Room Booking** - Automated room booking on lbsmobile.london.edu
+- 🤖 **LBS AI Assistant** - Query LBS's AI platform (coming soon)
+
+### Option 2: Command Line
+
+**Run individual scripts directly:**
+
+```bash
+# Extract assignments and study group info
+python run.py
+
+# Book a study room (configure room_booking_config.json first)
+python book_room.py
+```
+
+The scripts will:
 1. Open Chrome browser
 2. Ask you to login manually (or restore your previous session)
-3. Extract all the data automatically
-4. Generate `study_group_report.md`
-5. Tell you when it's done!
+3. Extract/process data automatically
+4. Generate output files
+5. Tell you when they're done!
 
 ### Upload to LLM
 
@@ -53,6 +88,12 @@ Take the generated `study_group_report.md` file and upload it to:
 The LLM will analyze your assignments and team members, then suggest who should do what based on everyone's backgrounds!
 
 ## Features
+
+### 🌐 Web UI Dashboard
+- Clean, modern interface accessible via browser
+- Real-time output streaming from all scripts
+- Three main functions accessible with one click
+- Runs on localhost:5000 for easy access
 
 ### 🔐 Smart Login
 - Tries to restore your previous session from cookies
@@ -69,6 +110,13 @@ The LLM will analyze your assignments and team members, then suggest who should 
 - Extracts all member names
 - Gets member backgrounds from Class List (when available)
 
+### 🏢 Automated Room Booking
+- Books study rooms on lbsmobile.london.edu
+- Configurable via JSON file (date, time, duration, attendees, building)
+- Automatically selects first available room
+- Handles Microsoft MFA login flow
+- See [ROOM_BOOKING_README.md](ROOM_BOOKING_README.md) for details
+
 ### 🤖 LLM-Optimized Output
 The markdown report includes:
 - Formatted assignment list grouped by date
@@ -83,10 +131,20 @@ The markdown report includes:
 
 ```
 StudAIGroupManager/
-├── run.py                     # ⭐ THE ONLY SCRIPT - All functionality in one file
+├── app.py                     # 🌐 Web UI server (Flask)
+├── run.py                     # 📚 Assignment extraction script
+├── book_room.py               # 🏢 Room booking automation script
+├── room_booking_config.json   # ⚙️  Room booking configuration
 ├── requirements.txt           # Python dependencies
 ├── README.md                  # This file
+├── ROOM_BOOKING_README.md     # Room booking documentation
 ├── .gitignore                 # Git ignore rules
+│
+├── templates/                 # Web UI templates
+│   └── index.html             # Main UI page
+│
+├── static/                    # Web UI static files
+│   └── style.css              # UI styling
 │
 ├── resources/                 # HTML files for testing (gitignored)
 │   └── README.md              # Info about resource files
@@ -95,8 +153,6 @@ StudAIGroupManager/
     ├── session.json           # Your saved session (auto-generated)
     └── study_group_report.md  # Generated markdown report
 ```
-
-**Clean and simple:** Just one Python file (`run.py`) containing all the logic!
 
 ## Example Output
 
