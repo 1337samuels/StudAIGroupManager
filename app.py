@@ -296,10 +296,12 @@ Please provide:
 
             if total_tokens > max_tokens:
                 # Need to chunk the report
-                chunk_size = max_tokens - system_tokens - base_tokens - 1000  # Leave buffer
+                # Use a reasonable buffer (10% of max_tokens, capped at 500)
+                buffer = min(int(max_tokens * 0.1), 500)
+                chunk_size = max_tokens - system_tokens - base_tokens - buffer
 
                 # Safety check: ensure chunk_size is positive and reasonable
-                if chunk_size < 100:
+                if chunk_size <= 0 or chunk_size < 100:
                     process_outputs['llm']['output'] += f'\n⚠️ Warning: Report is too large to chunk safely (chunk_size would be {chunk_size} tokens)\n'
                     process_outputs['llm']['output'] += f'Please reduce the report size or increase max_tokens limit.\n'
                     process_outputs['llm']['output'] += f'System tokens: {system_tokens}, Base tokens: {base_tokens}, Report tokens: {report_tokens}\n'
