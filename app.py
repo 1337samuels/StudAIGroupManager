@@ -262,19 +262,113 @@ def plan_week():
 
             process_outputs['llm']['output'] += '📡 Querying AI...\n\n'
 
-            # Prepare messages for AI
-            messages = [
-                {
-                    "role": "system",
-                    "content": "You are an AI Study group administrator designed to help study groups reach maximum cohesion by reducing the overhead of logistics and dispute management. Note that all members are busy people so try to be very concise and deliver only the important information.\n\n"
-                               "You can familiarize yourself with the team members and their diverse backgrounds using a file called study_group_report.md, containing the members' names, pre-mba education and experience and country of origin.\n"
-                               "Under the same file you'll find the team's upcoming schedule (classes, general announcement) and tasks for submission.\n"
-                               "Moreover, the team had signed a team agreement of how they expect to manage their joint responsibilities which you can find under finalized_team_agreement_2025.docx which provides guidelines on how the team's expectations of the group dynamics should look like.\n"
-                               "To help with room booking admin, you're provided with a json file named room_booking_config that specifies the structure required for the school's room booking system. NEVER TRY TO BOOK A ROOM FOR OVER 3 HOURS."
-                },
-                {
-                    "role": "user",
-                    "content": f"""What is my work allocation for the upcoming week?
+            # Prepare system message
+            system_message = {
+                "role": "system",
+                "content": "You are an AI Study group administrator designed to help study groups reach maximum cohesion by reducing the overhead of logistics and dispute management. Note that all members are busy people so try to be very concise and deliver only the important information.\n\n"
+                           "You can familiarize yourself with the team members and their diverse backgrounds using a file called study_group_report.md, containing the members' names, pre-mba education and experience and country of origin.\n"
+                           "Under the same file you'll find the team's upcoming schedule (classes, general announcement) and tasks for submission.\n"
+                           "Moreover, the team had signed a team agreement of how they expect to manage their joint responsibilities which you can find under finalized_team_agreement_2025.docx which provides guidelines on how the team's expectations of the group dynamics should look like.\n"
+                           "To help with room booking admin, you're provided with a json file named room_booking_config that specifies the structure required for the school's room booking system. NEVER TRY TO BOOK A ROOM FOR OVER 3 HOURS."
+            }
+
+            # Rough token estimation (1 token ≈ 4 characters)
+            def estimate_tokens(text):
+                return len(text) // 4
+
+            # Check if we need to chunk the report
+            max_tokens = 120000  # Conservative limit (model supports 200k but leave room for response)
+            system_tokens = estimate_tokens(system_message['content'])
+            base_prompt = """What is my work allocation for the upcoming week?
+
+Please provide:
+- A structured weekly plan with assignment allocations (leader + mentee pairs)
+- Task priorities based on professional backgrounds
+- Recommended study session times for each duo
+- Room booking suggestions in JSON format with: booking_date (YYYY-MM-DD), start_time (HH:MM), duration_hours (max 3), attendees, study_group_name, project_name, building
+- A social gathering suggestion for the team
+"""
+            base_tokens = estimate_tokens(base_prompt)
+            report_tokens = estimate_tokens(report_content)
+            total_tokens = system_tokens + base_tokens + report_tokens
+
+            process_outputs['llm']['output'] += f'📊 Estimated tokens: {total_tokens:,}\n'
+
+            if total_tokens > max_tokens:
+                # Need to chunk the report
+                chunk_size = max_tokens - system_tokens - base_tokens - 1000  # Leave buffer
+                chunks = []
+                current_pos = 0
+
+                while current_pos < len(report_content):
+                    # Find a good breaking point (end of line)
+                    end_pos = min(current_pos + chunk_size * 4, len(report_content))  # *4 because chars to tokens
+                    if end_pos < len(report_content):
+                        # Try to break at newline
+                        newline_pos = report_content.rfind('\n', current_pos, end_pos)
+                        if newline_pos > current_pos:
+                            end_pos = newline_pos
+
+                    chunks.append(report_content[current_pos:end_pos])
+                    current_pos = end_pos
+
+                num_chunks = len(chunks)
+                process_outputs['llm']['output'] += f'⚠️ Report too large! Splitting into {num_chunks} chunks...\n\n'
+
+                # Send chunks
+                conversation_history = [system_message]
+
+                for i, chunk in enumerate(chunks):
+                    chunk_num = i + 1
+                    process_outputs['llm']['output'] += f'📤 Sending chunk {chunk_num}/{num_chunks}...\n'
+
+                    if chunk_num == 1:
+                        chunk_message = f"""I will send you the study group report in {num_chunks} parts due to its size. Please wait for all parts before responding.
+
+PART {chunk_num}/{num_chunks}:
+
+{chunk}
+
+[Continued in next message...]"""
+                    elif chunk_num < num_chunks:
+                        chunk_message = f"""PART {chunk_num}/{num_chunks} (continued):
+
+{chunk}
+
+[Continued in next message...]"""
+                    else:
+                        chunk_message = f"""PART {chunk_num}/{num_chunks} (final):
+
+{chunk}
+
+---
+
+Now that you have received all {num_chunks} parts of the study group report, please provide:
+- A structured weekly plan with assignment allocations (leader + mentee pairs)
+- Task priorities based on professional backgrounds
+- Recommended study session times for each duo
+- Room booking suggestions in JSON format with: booking_date (YYYY-MM-DD), start_time (HH:MM), duration_hours (max 3), attendees, study_group_name, project_name, building
+- A social gathering suggestion for the team"""
+
+                    conversation_history.append({"role": "user", "content": chunk_message})
+
+                    # Get acknowledgment from AI (except for last chunk)
+                    if chunk_num < num_chunks:
+                        ack_response = query_ai(conversation_history)
+                        conversation_history.append({"role": "assistant", "content": ack_response})
+                        process_outputs['llm']['output'] += f'✓ Chunk {chunk_num} acknowledged\n'
+
+                # Get final response
+                process_outputs['llm']['output'] += f'\n⏳ Generating final response...\n\n'
+                response = query_ai(conversation_history)
+
+            else:
+                # Send as single message
+                messages = [
+                    system_message,
+                    {
+                        "role": "user",
+                        "content": f"""What is my work allocation for the upcoming week?
 
 Here's the study group report:
 {report_content}
@@ -286,11 +380,11 @@ Please provide:
 - Room booking suggestions in JSON format with: booking_date (YYYY-MM-DD), start_time (HH:MM), duration_hours (max 3), attendees, study_group_name, project_name, building
 - A social gathering suggestion for the team
 """
-                }
-            ]
+                    }
+                ]
 
-            # Query AI
-            response = query_ai(messages)
+                # Query AI
+                response = query_ai(messages)
 
             process_outputs['llm']['output'] += '=' * 80 + '\n'
             process_outputs['llm']['output'] += 'AI WEEKLY PLAN\n'
