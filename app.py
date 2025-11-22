@@ -277,7 +277,7 @@ def plan_week():
                 return len(text) // 4
 
             # Check if we need to chunk the report
-            max_tokens = 120000  # Conservative limit (model supports 200k but leave room for response)
+            max_tokens = 500  # Conservative limit for testing (reduced to prevent crashes)
             system_tokens = estimate_tokens(system_message['content'])
             base_prompt = """What is my work allocation for the upcoming week?
 
@@ -297,22 +297,60 @@ Please provide:
             if total_tokens > max_tokens:
                 # Need to chunk the report
                 chunk_size = max_tokens - system_tokens - base_tokens - 1000  # Leave buffer
+
+                # Safety check: ensure chunk_size is positive and reasonable
+                if chunk_size < 100:
+                    process_outputs['llm']['output'] += f'\n⚠️ Warning: Report is too large to chunk safely (chunk_size would be {chunk_size} tokens)\n'
+                    process_outputs['llm']['output'] += f'Please reduce the report size or increase max_tokens limit.\n'
+                    process_outputs['llm']['output'] += f'System tokens: {system_tokens}, Base tokens: {base_tokens}, Report tokens: {report_tokens}\n'
+                    return
+
                 chunks = []
                 current_pos = 0
+                max_iterations = 1000  # Safety limit to prevent infinite loops
+                iteration = 0
 
-                while current_pos < len(report_content):
+                while current_pos < len(report_content) and iteration < max_iterations:
+                    iteration += 1
+
                     # Find a good breaking point (end of line)
                     end_pos = min(current_pos + chunk_size * 4, len(report_content))  # *4 because chars to tokens
+
+                    # Safety check: ensure we make progress
+                    if end_pos <= current_pos:
+                        process_outputs['llm']['output'] += f'\n⚠️ Error: Chunking failed - no progress at position {current_pos}\n'
+                        break
+
                     if end_pos < len(report_content):
                         # Try to break at newline
                         newline_pos = report_content.rfind('\n', current_pos, end_pos)
                         if newline_pos > current_pos:
                             end_pos = newline_pos
+                        # If no newline found, use end_pos as is (don't get stuck)
 
-                    chunks.append(report_content[current_pos:end_pos])
+                    chunk_content = report_content[current_pos:end_pos]
+
+                    # Safety check: ensure chunk is not empty
+                    if not chunk_content or len(chunk_content) == 0:
+                        process_outputs['llm']['output'] += f'\n⚠️ Error: Empty chunk generated at position {current_pos}\n'
+                        break
+
+                    chunks.append(chunk_content)
                     current_pos = end_pos
 
+                # Check if we hit the iteration limit
+                if iteration >= max_iterations:
+                    process_outputs['llm']['output'] += f'\n⚠️ Error: Maximum iterations ({max_iterations}) reached during chunking\n'
+                    process_outputs['llm']['output'] += f'This is a safety check to prevent infinite loops. Please contact support.\n'
+                    return
+
                 num_chunks = len(chunks)
+
+                # Safety check: ensure we have chunks
+                if num_chunks == 0:
+                    process_outputs['llm']['output'] += f'\n⚠️ Error: No chunks were created\n'
+                    return
+
                 process_outputs['llm']['output'] += f'⚠️ Report too large! Splitting into {num_chunks} chunks...\n\n'
 
                 # Send chunks
