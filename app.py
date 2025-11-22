@@ -534,7 +534,6 @@ Please provide:
 
             process_outputs['llm']['output'] += '\n' + '=' * 80 + '\n'
             process_outputs['llm']['output'] += '✓ Planning completed!\n'
-            process_outputs['llm']['output'] += '🔄 Preparing weekly plan dashboard...\n'
 
         except Exception as e:
             process_outputs['llm']['output'] += f'\n✗ Error: {str(e)}\n'

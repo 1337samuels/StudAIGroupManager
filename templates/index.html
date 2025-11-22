@@ -633,7 +633,7 @@
                             // Allocation completed
                             document.getElementById('request-allocation-btn').disabled = false;
 
-                            // Only auto-trigger room booking and redirect for allocation requests (not chat)
+                            // Only auto-trigger room booking for allocation requests (not chat)
                             // AND only if the process actually completed (check for completion message)
                             if (processType === 'llm' && !isChat && data.output &&
                                 (data.output.includes('✓ Planning completed!') || data.output.includes('✗ Error:'))) {
@@ -642,23 +642,25 @@
                                 // Check if the output contains the success message for JSON extraction
                                 if (data.output.includes('✓ Extracted and saved room booking configuration')) {
                                     console.log('Booking config found, auto-triggering room booking...');
-                                    output.textContent += '\n\n🔄 Redirecting to weekly plan dashboard...\n';
                                     setTimeout(() => {
                                         studentBookRoom();
-                                        // Redirect to weekly plan page after booking starts
-                                        setTimeout(() => {
-                                            console.log('Redirecting to /weekly-plan');
-                                            window.location.href = '/weekly-plan';
-                                        }, 2000);
                                     }, 500);
-                                } else {
-                                    console.log('No booking config found, redirecting directly to plan...');
-                                    output.textContent += '\n\n🔄 Redirecting to weekly plan dashboard...\n';
-                                    // Redirect to weekly plan page
-                                    setTimeout(() => {
-                                        console.log('Redirecting to /weekly-plan');
+                                }
+
+                                // Show "View Weekly Plan" button
+                                const outputContainer = document.getElementById('student-allocation-output');
+                                let viewPlanBtn = document.getElementById('view-weekly-plan-btn');
+
+                                if (!viewPlanBtn) {
+                                    viewPlanBtn = document.createElement('button');
+                                    viewPlanBtn.id = 'view-weekly-plan-btn';
+                                    viewPlanBtn.className = 'btn btn-primary btn-large';
+                                    viewPlanBtn.style.marginTop = '15px';
+                                    viewPlanBtn.innerHTML = '<span class="btn-icon">📊</span> View Weekly Plan Dashboard';
+                                    viewPlanBtn.onclick = () => {
                                         window.location.href = '/weekly-plan';
-                                    }, 1000);
+                                    };
+                                    outputContainer.appendChild(viewPlanBtn);
                                 }
                             }
                         }
