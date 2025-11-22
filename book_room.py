@@ -184,19 +184,14 @@ class RoomBooker:
                     current_url = self.driver.current_url.lower()
 
                     # Check if we're successfully logged in
+                    # Only check URL - don't try to access page elements during auth flow
                     if 'lbsmobile.london.edu' in current_url:
                         if not any(word in current_url for word in ['login', 'auth', 'microsoft', 'saml']):
-                            # Double-check we're actually logged in by looking for user elements
-                            try:
-                                # Check if the "My Bookings" button is visible (indicates logged in)
-                                my_bookings = self.driver.find_element(By.ID, "userBookings")
-                                if my_bookings.is_displayed() or my_bookings.value_of_css_property("display") != "none":
-                                    print("\n✓ Login successful!")
-                                    print(f"  Current URL: {self.driver.current_url}")
-                                    return True
-                            except:
-                                # If we can't find the button, wait a bit more
-                                pass
+                            print("\n✓ Login successful!")
+                            print(f"  Current URL: {self.driver.current_url}")
+                            # Give the page a moment to fully load after login
+                            time.sleep(2)
+                            return True
 
                     elapsed = int(time.time() - start_time)
                     if elapsed % 10 == 0 and elapsed > 0:
