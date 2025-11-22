@@ -634,11 +634,13 @@
                             document.getElementById('request-allocation-btn').disabled = false;
 
                             // Only auto-trigger room booking and redirect for allocation requests (not chat)
-                            if (processType === 'llm' && !isChat) {
+                            // AND only if the process actually completed (check for completion message)
+                            if (processType === 'llm' && !isChat && data.output &&
+                                (data.output.includes('✓ Planning completed!') || data.output.includes('✗ Error:'))) {
                                 console.log('Allocation completed successfully!');
 
                                 // Check if the output contains the success message for JSON extraction
-                                if (data.output && data.output.includes('✓ Extracted and saved room booking configuration')) {
+                                if (data.output.includes('✓ Extracted and saved room booking configuration')) {
                                     console.log('Booking config found, auto-triggering room booking...');
                                     output.textContent += '\n\n🔄 Redirecting to weekly plan dashboard...\n';
                                     setTimeout(() => {
