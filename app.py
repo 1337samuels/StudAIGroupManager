@@ -352,7 +352,7 @@ def plan_week():
                 return len(text) // 4
 
             # Check if we need to chunk the report
-            max_tokens = 500  # Conservative limit for testing (reduced to prevent crashes)
+            max_tokens = 1200  # Increased limit after report minification
             system_tokens = estimate_tokens(system_message['content'])
             base_prompt = """What is my work allocation for the upcoming week?
 
@@ -360,7 +360,7 @@ Please provide:
 - A structured weekly plan with assignment allocations (leader + mentee pairs)
 - Task priorities based on professional backgrounds
 - Recommended study session times for each duo
-- Room booking suggestions in JSON format with: booking_date (YYYY-MM-DD), start_time (HH:MM), duration_hours (max 3), attendees, study_group_name, project_name, building
+- Room booking - for each group member duo, while taking into account the lecture schedule provided (and avoid schedule conflicts), output a json file under the same structure given under the config file. building name under "building" can ONLY be either "Sussex Place". assume a lecture is 3 hours long so if a lecture starts at a certain hour the members are unavailable for 3 hours.
 - A social gathering suggestion for the team
 """
             base_tokens = estimate_tokens(base_prompt)
@@ -462,7 +462,7 @@ Now that you have received all {num_chunks} parts of the study group report, ple
 - A structured weekly plan with assignment allocations (leader + mentee pairs)
 - Task priorities based on professional backgrounds
 - Recommended study session times for each duo
-- Room booking suggestions in JSON format with: booking_date (YYYY-MM-DD), start_time (HH:MM), duration_hours (max 3), attendees, study_group_name, project_name, building
+- Room booking - for each group member duo, while taking into account the lecture schedule provided (and avoid schedule conflicts), output a json file under the same structure given under the config file. building name under "building" can ONLY be either "Sussex Place". assume a lecture is 3 hours long so if a lecture starts at a certain hour the members are unavailable for 3 hours.
 - A social gathering suggestion for the team"""
 
                     conversation_history.append({"role": "user", "content": chunk_message})
@@ -492,7 +492,7 @@ Please provide:
 - A structured weekly plan with assignment allocations (leader + mentee pairs)
 - Task priorities based on professional backgrounds
 - Recommended study session times for each duo
-- Room booking suggestions in JSON format with: booking_date (YYYY-MM-DD), start_time (HH:MM), duration_hours (max 3), attendees, study_group_name, project_name, building
+- Room booking - for each group member duo, while taking into account the lecture schedule provided (and avoid schedule conflicts), output a json file under the same structure given under the config file. building name under "building" can ONLY be either "Sussex Place". assume a lecture is 3 hours long so if a lecture starts at a certain hour the members are unavailable for 3 hours.
 - A social gathering suggestion for the team
 """
                     }
