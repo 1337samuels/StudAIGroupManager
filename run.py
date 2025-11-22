@@ -266,16 +266,8 @@ class StudyGroupManager:
         html = self.driver.page_source
         soup = BeautifulSoup(html, 'html.parser')
 
-        # Find all agenda items (different structure than dashboard)
-        agenda_items = soup.find_all('li', class_=lambda x: x and 'agenda-event__item' in x if x else False)
-
-        # If no items found, try alternative selectors
-        if not agenda_items:
-            agenda_items = soup.find_all('li', class_='agenda-event__item')
-        if not agenda_items:
-            # Fallback to any list item in agenda
-            agenda_items = soup.find_all('li', class_=re.compile(r'.*agenda.*'))
-
+        # Find all agenda days and items
+        agenda_items = soup.find_all('li', class_='agenda-event__item')
         print(f"Found {len(agenda_items)} agenda items")
 
         # Parse assignments and events
@@ -286,86 +278,89 @@ class StudyGroupManager:
         seen_assignments = set()
         seen_events = set()
 
+        # Track current date context
+        current_date = None
+
         for item in agenda_items:
             try:
-                # Extract all text content
-                item_text = item.get_text(separator=' ', strip=True)
+                # Check if there's a preceding agenda-date element (find parent structure)
+                parent = item.find_parent('div', class_='agenda-event__container')
+                if parent:
+                    date_div = parent.find_previous_sibling('div', class_='agenda-day')
+                    if date_div:
+                        date_elem = date_div.find('h3', class_='agenda-date')
+                        if date_elem:
+                            # Extract date from aria-hidden span (e.g., "Tue, 25 Nov")
+                            date_text = date_elem.find('span', {'aria-hidden': 'true'})
+                            if date_text:
+                                current_date = date_text.get_text(strip=True)
 
-                # Determine if this is an assignment or event
-                # Assignments typically have "Assignment" or "Quiz" in text
-                # Events have calendar markers or time ranges
+                # Determine type by icon class
+                icon = item.find('i')
+                is_assignment = icon and 'icon-assignment' in icon.get('class', [])
+                is_quiz = icon and 'icon-quiz' in icon.get('class', [])
+                is_event = icon and 'icon-calendar-month' in icon.get('class', [])
 
-                is_assignment_item = any(keyword in item_text for keyword in ['Assignment', 'Quiz', 'due'])
-                is_event_item = any(keyword in item_text for keyword in ['Calendar', 'Lecture', 'Class', 'Session'])
-
-                # Extract title
-                title_elem = item.find('a', class_=re.compile(r'.*item-title.*')) or item.find('a')
+                # Extract title from agenda-event__title span
+                title_elem = item.find('span', class_='agenda-event__title')
                 title = title_elem.get_text(strip=True) if title_elem else 'Untitled'
 
-                # Extract course/context
-                course_elem = item.find('span', class_=re.compile(r'.*context.*'))
-                course = course_elem.get_text(strip=True) if course_elem else 'Unknown Course'
+                # Extract time from agenda-event__time div
+                time_elem = item.find('div', class_='agenda-event__time')
+                time_str = time_elem.get_text(strip=True) if time_elem else None
 
-                # Extract date/time
-                time_elem = item.find('time') or item.find('span', class_=re.compile(r'.*date.*'))
-                date_str = time_elem.get('datetime') if time_elem and time_elem.get('datetime') else None
+                # Extract course from screenreader text containing "Calendar"
+                course = 'Unknown Course'
+                screenreader_spans = item.find_all('span', class_='screenreader-only')
+                for span in screenreader_spans:
+                    text = span.get_text(strip=True)
+                    if text.startswith('Calendar '):
+                        # Format: "Calendar C111   AUT25 Finance I"
+                        course = text.replace('Calendar ', '').strip()
+                        break
 
-                # Try to parse datetime
-                event_datetime = None
-                if date_str:
-                    try:
-                        # Try ISO format first
-                        event_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                    except:
-                        pass
+                # Parse datetime
+                if not current_date or not time_str:
+                    continue
 
-                # If still no datetime, try parsing from text
-                if not event_datetime:
-                    # Look for date patterns in text
-                    date_pattern = r'(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})'
-                    time_pattern = r'(\d{1,2}):(\d{2})'
+                # Clean time string (e.g., "Due 16:00" -> "16:00" or "16:00" -> "16:00")
+                time_clean = time_str.replace('Due ', '').replace('Starts at ', '').strip()
 
-                    date_match = re.search(date_pattern, item_text, re.IGNORECASE)
-                    time_match = re.search(time_pattern, item_text)
+                # Parse date (e.g., "Tue, 25 Nov" with current year)
+                try:
+                    # Add current year to the date string
+                    current_year = datetime.now().year
+                    date_with_year = f"{current_date} {current_year}"
+                    # Parse format: "Tue, 25 Nov 2025"
+                    date_obj = datetime.strptime(date_with_year, "%a, %d %b %Y")
+                    # Combine with time
+                    time_obj = datetime.strptime(time_clean, "%H:%M").time()
+                    event_datetime = datetime.combine(date_obj.date(), time_obj)
+                except Exception as e:
+                    print(f"  Warning: Could not parse date/time: {current_date} {time_clean} - {e}")
+                    continue
 
-                    if date_match:
-                        day, month, year = date_match.groups()
-                        time_str = f"{time_match.group(1)}:{time_match.group(2)}" if time_match else "09:00"
-
-                        try:
-                            date_str_full = f"{day} {month} {year} {time_str}"
-                            event_datetime = datetime.strptime(date_str_full, "%d %b %Y %H:%M")
-                        except:
-                            pass
-
-                # Extract location
-                location_elem = item.find('span', class_=re.compile(r'.*location.*'))
-                location = location_elem.get_text(strip=True) if location_elem else ''
-
-                # Extract URL
-                url = title_elem['href'] if title_elem and title_elem.get('href') else ''
-
-                # Skip if no valid datetime or outside our range
-                if not event_datetime or not (today <= event_datetime <= two_weeks):
+                # Skip if outside our range
+                if not (today <= event_datetime <= two_weeks):
                     continue
 
                 # Create unique identifier to detect duplicates
                 unique_id = f"{title}|{event_datetime.strftime('%Y-%m-%d %H:%M')}|{course}"
 
                 # Categorize and add to appropriate list (avoiding duplicates)
-                if is_assignment_item and unique_id not in seen_assignments:
+                if (is_assignment or is_quiz) and unique_id not in seen_assignments:
                     seen_assignments.add(unique_id)
                     self.assignments.append({
                         'title': title,
                         'course': course,
-                        'type': 'Quiz' if 'Quiz' in item_text else 'Assignment',
+                        'type': 'Quiz' if is_quiz else 'Assignment',
                         'due_date': event_datetime.strftime("%d %B %Y %H:%M"),
                         'due_day': event_datetime.strftime("%A"),
                         'due_datetime': event_datetime,
-                        'location': location,
-                        'url': url
+                        'location': '',  # Location not in agenda view
+                        'url': ''  # URL extraction would need data-event-id lookup
                     })
-                elif is_event_item and unique_id not in seen_events:
+                elif is_event and unique_id not in seen_events:
                     seen_events.add(unique_id)
                     self.events.append({
                         'title': title,
@@ -374,8 +369,8 @@ class StudyGroupManager:
                         'event_date': event_datetime.strftime("%d %B %Y %H:%M"),
                         'event_day': event_datetime.strftime("%A"),
                         'due_datetime': event_datetime,  # For sorting
-                        'location': location,
-                        'url': url
+                        'location': '',  # Location not in agenda view
+                        'url': ''  # URL extraction would need data-event-id lookup
                     })
 
             except Exception as e:
