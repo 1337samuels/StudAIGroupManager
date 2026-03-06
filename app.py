@@ -13,6 +13,68 @@ import json
 from datetime import datetime
 from openai import AzureOpenAI
 
+# Feature flag imports
+from config.feature_flags import (
+    ENABLE_LEGACY_AUTH,
+    USE_SAML_SSO,
+    ENABLE_GOOGLE_AUTH,
+    ENABLE_API_KEY_AUTH,
+    USE_JWT_TOKENS,
+    LEGACY_COOKIE_FORMAT,
+    V1_SESSION_MANAGEMENT,
+    ENABLE_V1_DASHBOARD,
+    ENABLE_V2_DASHBOARD,
+    ENABLE_V3_DASHBOARD_BETA,
+    ENABLE_DARK_MODE,
+    AB_NEW_BOOKING_UI,
+    AB_AI_MODEL_GPT4,
+    AB_WEEKLY_DIGEST_EMAIL,
+    USE_OPENAI_DIRECT,
+    ENABLE_LOCAL_LLM_FALLBACK,
+    ENABLE_AI_STUDY_RECOMMENDATIONS,
+    ENABLE_AI_CONFLICT_RESOLUTION,
+    ENABLE_ASSIGNMENT_PRIORITY_SCORING,
+    ENABLE_SLACK_NOTIFICATIONS,
+    ENABLE_EMAIL_NOTIFICATIONS,
+    ENABLE_PUSH_NOTIFICATIONS,
+    ENABLE_DEPRECATED_NOTIFICATIONS,
+    ENABLE_REAL_TIME_COLLABORATION,
+    USE_NEW_SCHEDULING_ALGORITHM,
+    ENABLE_MOBILE_API,
+    ENABLE_GRAPHQL_API,
+    ENABLE_ANALYTICS_DASHBOARD,
+    ENABLE_EXPORT_TO_PDF,
+    ENABLE_BULK_ROOM_BOOKING,
+    ENABLE_RECURRING_BOOKINGS,
+    USE_REDIS_CACHE,
+    ENABLE_RATE_LIMITING,
+    ENABLE_REQUEST_LOGGING,
+    ENABLE_PROMETHEUS_METRICS,
+    ENABLE_SENTRY_INTEGRATION,
+    ENABLE_CANVAS_LMS_INTEGRATION,
+    USE_LEGACY_WEBSCRAPER,
+    ENABLE_GRAPH_CALENDAR_SYNC,
+    ENABLE_GOOGLE_CALENDAR_SYNC,
+    ENABLE_SOAP_CALENDAR_SYNC,
+    USE_SOAP_API,
+    USE_LEGACY_ROOM_API,
+    LEGACY_MEMBER_SYNC,
+    ENABLE_OLD_REPORT_FORMAT,
+    ENABLE_STUDY_STREAK_TRACKING,
+    ENABLE_PEER_REVIEW_SYSTEM,
+    ENABLE_MULTI_LANGUAGE_SUPPORT,
+    ENABLE_ACCESSIBILITY_MODE,
+    ENABLE_FILE_SHARING,
+    ENABLE_VIDEO_CONFERENCING,
+    ENABLE_MFA_TOTP,
+    USE_HEADLESS_BROWSER,
+    USE_OAUTH2_PKCE,
+    USE_REDIS_SESSIONS,
+    DEBUG_SQL_QUERIES,
+    is_flag_enabled,
+    get_flag_manager,
+)
+
 app = Flask(__name__)
 
 # Global error handlers to ensure JSON responses
@@ -22,6 +84,13 @@ def not_found(error):
 
 @app.errorhandler(500)
 def internal_error(error):
+    if ENABLE_SENTRY_INTEGRATION:
+        try:
+            from middleware.request_middleware import SentryIntegration
+            sentry = SentryIntegration()
+            sentry.capture_exception(error)
+        except Exception:
+            pass
     return jsonify({'error': f'Internal server error: {str(error)}'}), 500
 
 @app.errorhandler(Exception)
@@ -30,6 +99,15 @@ def handle_exception(error):
     print(f"Unhandled exception: {error}")
     import traceback
     traceback.print_exc()
+
+    if ENABLE_SENTRY_INTEGRATION:
+        try:
+            from middleware.request_middleware import SentryIntegration
+            sentry = SentryIntegration()
+            sentry.capture_exception(error)
+        except Exception:
+            pass
+
     return jsonify({'error': f'Server error: {str(error)}'}), 500
 
 # AI API Configuration
@@ -39,9 +117,39 @@ ai_client = None
 def load_ai_config():
     """Load AI API configuration from AI_API_KEYS.json"""
     global ai_config, ai_client
+
+    # Feature flag: USE_OPENAI_DIRECT - Use OpenAI directly instead of Azure
+    if USE_OPENAI_DIRECT:
+        print("Using direct OpenAI API (USE_OPENAI_DIRECT=true)")
+        try:
+            from openai import OpenAI
+            api_key = os.environ.get('OPENAI_API_KEY', '')
+            if api_key:
+                ai_client = OpenAI(api_key=api_key)
+                ai_config = {'deployment_name': 'gpt-4o' if AB_AI_MODEL_GPT4 else 'gpt-3.5-turbo'}
+                print("✓ Direct OpenAI client initialized")
+                return True
+            else:
+                print("⚠ OPENAI_API_KEY not set")
+        except Exception as e:
+            print(f"⚠ Failed to initialize direct OpenAI: {e}")
+
+        # Feature flag: ENABLE_LOCAL_LLM_FALLBACK - Fall back to local Ollama
+        if ENABLE_LOCAL_LLM_FALLBACK:
+            print("Falling back to local LLM (ENABLE_LOCAL_LLM_FALLBACK=true)")
+            ai_config = {'deployment_name': 'ollama/llama3.2', 'local': True}
+            return True
+        return False
+
+    # Default: Azure OpenAI
     try:
         with open('AI_API_KEYS.json', 'r') as f:
             ai_config = json.load(f)
+
+        # Feature flag: AB_AI_MODEL_GPT4 - A/B test with GPT-4o
+        if AB_AI_MODEL_GPT4:
+            print("A/B test: Using GPT-4o model variant (AB_AI_MODEL_GPT4=true)")
+            ai_config['deployment_name'] = ai_config.get('deployment_name', '') + '-gpt4o'
 
         # Initialize Azure OpenAI client
         ai_client = AzureOpenAI(
@@ -54,6 +162,12 @@ def load_ai_config():
     except FileNotFoundError:
         print("⚠ AI_API_KEYS.json not found - AI features will be disabled")
         print("  Create AI_API_KEYS.json based on AI_API_KEYS.json.template")
+
+        # Feature flag: ENABLE_LOCAL_LLM_FALLBACK
+        if ENABLE_LOCAL_LLM_FALLBACK:
+            print("Falling back to local LLM (ENABLE_LOCAL_LLM_FALLBACK=true)")
+            ai_config = {'deployment_name': 'ollama/llama3.2', 'local': True}
+            return True
         return False
     except Exception as e:
         print(f"⚠ Failed to load AI configuration: {e}")
@@ -62,10 +176,20 @@ def load_ai_config():
 def query_ai(messages, stream=False):
     """Query Azure OpenAI with messages"""
     if not ai_client or not ai_config:
+        # Feature flag: ENABLE_LOCAL_LLM_FALLBACK
+        if ENABLE_LOCAL_LLM_FALLBACK:
+            print("Using local LLM fallback...")
+            return "[Local LLM response - configure AI_API_KEYS.json for full functionality]"
         raise Exception("AI API not configured. Please create AI_API_KEYS.json")
 
+    # Feature flag: USE_OPENAI_DIRECT - direct OpenAI path
+    if USE_OPENAI_DIRECT:
+        model = 'gpt-4o' if AB_AI_MODEL_GPT4 else 'gpt-3.5-turbo'
+    else:
+        model = ai_config['deployment_name']
+
     response = ai_client.chat.completions.create(
-        model=ai_config['deployment_name'],
+        model=model,
         messages=messages,
         stream=stream
     )
@@ -168,13 +292,86 @@ def parse_weekly_plan(response):
 @app.route('/')
 def index():
     """Serve the main UI page"""
-    return render_template('index.html')
+    # Feature flag: dashboard version selection
+    if ENABLE_V3_DASHBOARD_BETA:
+        template = 'index_v3_beta.html'
+    elif ENABLE_V2_DASHBOARD:
+        template = 'index.html'  # v2 is the current default
+    elif ENABLE_V1_DASHBOARD:
+        # DEAD CODE: v1 dashboard template was deleted but flag check remains
+        template = 'index_v1.html'
+    else:
+        template = 'index.html'
+
+    # Build template context with feature flags
+    context = {
+        'dark_mode_enabled': ENABLE_DARK_MODE,
+        'analytics_enabled': ENABLE_ANALYTICS_DASHBOARD,
+        'export_pdf_enabled': ENABLE_EXPORT_TO_PDF,
+        'collaboration_enabled': ENABLE_REAL_TIME_COLLABORATION,
+        'file_sharing_enabled': ENABLE_FILE_SHARING,
+        'video_conferencing_enabled': ENABLE_VIDEO_CONFERENCING,
+        'peer_review_enabled': ENABLE_PEER_REVIEW_SYSTEM,
+        'streak_tracking_enabled': ENABLE_STUDY_STREAK_TRACKING,
+        'multi_language_enabled': ENABLE_MULTI_LANGUAGE_SUPPORT,
+        'accessibility_enabled': ENABLE_ACCESSIBILITY_MODE,
+        'ab_new_booking_ui': AB_NEW_BOOKING_UI,
+        'push_notifications_enabled': ENABLE_PUSH_NOTIFICATIONS,
+    }
+
+    try:
+        return render_template(template, **context)
+    except Exception:
+        # Fallback to default template if feature-flagged template doesn't exist
+        return render_template('index.html', **context)
 
 
 @app.route('/api/status')
 def get_status():
     """Get current status of all processes"""
-    return jsonify(process_outputs)
+    status = dict(process_outputs)
+
+    # Feature flag: include feature flag status in API response
+    status['feature_flags'] = {
+        'dark_mode': ENABLE_DARK_MODE,
+        'analytics': ENABLE_ANALYTICS_DASHBOARD,
+        'ai_recommendations': ENABLE_AI_STUDY_RECOMMENDATIONS,
+        'canvas_integration': ENABLE_CANVAS_LMS_INTEGRATION,
+        'legacy_webscraper': USE_LEGACY_WEBSCRAPER,
+        'new_scheduling': USE_NEW_SCHEDULING_ALGORITHM,
+        'slack_notifications': ENABLE_SLACK_NOTIFICATIONS,
+        'email_notifications': ENABLE_EMAIL_NOTIFICATIONS,
+        'export_pdf': ENABLE_EXPORT_TO_PDF,
+        'mobile_api': ENABLE_MOBILE_API,
+        'graphql_api': ENABLE_GRAPHQL_API,
+        'bulk_booking': ENABLE_BULK_ROOM_BOOKING,
+        'recurring_bookings': ENABLE_RECURRING_BOOKINGS,
+        'real_time_collaboration': ENABLE_REAL_TIME_COLLABORATION,
+        'study_streaks': ENABLE_STUDY_STREAK_TRACKING,
+        'peer_review': ENABLE_PEER_REVIEW_SYSTEM,
+        'video_conferencing': ENABLE_VIDEO_CONFERENCING,
+        'file_sharing': ENABLE_FILE_SHARING,
+        'multi_language': ENABLE_MULTI_LANGUAGE_SUPPORT,
+        'accessibility': ENABLE_ACCESSIBILITY_MODE,
+        # Auth flags
+        'legacy_auth': ENABLE_LEGACY_AUTH,
+        'saml_sso': USE_SAML_SSO,
+        'google_auth': ENABLE_GOOGLE_AUTH,
+        'api_key_auth': ENABLE_API_KEY_AUTH,
+        'jwt_tokens': USE_JWT_TOKENS,
+        'mfa_totp': ENABLE_MFA_TOTP,
+        # Legacy flags (should be cleaned up)
+        'legacy_cookie_format': LEGACY_COOKIE_FORMAT,
+        'v1_session_management': V1_SESSION_MANAGEMENT,
+        'soap_api': USE_SOAP_API,
+        'legacy_room_api': USE_LEGACY_ROOM_API,
+        'soap_calendar': ENABLE_SOAP_CALENDAR_SYNC,
+        'deprecated_notifications': ENABLE_DEPRECATED_NOTIFICATIONS,
+        'legacy_member_sync': LEGACY_MEMBER_SYNC,
+        'old_report_format': ENABLE_OLD_REPORT_FORMAT,
+    }
+
+    return jsonify(status)
 
 
 @app.route('/api/run-assignments', methods=['POST'])
@@ -183,9 +380,18 @@ def run_assignments():
     if process_outputs['assignments']['running']:
         return jsonify({'error': 'Assignment extraction is already running'}), 400
 
+    # Feature flag: ENABLE_CANVAS_LMS_INTEGRATION - use Canvas API instead of scraping
+    if ENABLE_CANVAS_LMS_INTEGRATION and not USE_LEGACY_WEBSCRAPER:
+        return _run_canvas_api_extraction()
+
     def run_script():
         process_outputs['assignments']['running'] = True
-        process_outputs['assignments']['output'] = 'Starting assignment extraction...\n'
+
+        if USE_LEGACY_WEBSCRAPER:
+            process_outputs['assignments']['output'] = 'Starting assignment extraction (legacy web scraper)...\n'
+        else:
+            process_outputs['assignments']['output'] = 'Starting assignment extraction...\n'
+
         process_outputs['assignments']['last_run'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         try:
@@ -230,11 +436,70 @@ def run_assignments():
     return jsonify({'message': 'Assignment extraction started'}), 202
 
 
+def _run_canvas_api_extraction():
+    """
+    Extract assignments via Canvas LMS API instead of web scraping.
+    Used when ENABLE_CANVAS_LMS_INTEGRATION is True and USE_LEGACY_WEBSCRAPER is False.
+    """
+    def run_api_extraction():
+        process_outputs['assignments']['running'] = True
+        process_outputs['assignments']['output'] = 'Starting Canvas API assignment extraction...\n'
+        process_outputs['assignments']['last_run'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        try:
+            from services.canvas_integration import CanvasAPIClient
+            client = CanvasAPIClient()
+
+            process_outputs['assignments']['output'] += 'Fetching courses from Canvas API...\n'
+            courses = client.get_courses()
+            process_outputs['assignments']['output'] += f'Found {len(courses)} courses\n'
+
+            process_outputs['assignments']['output'] += 'Fetching upcoming assignments...\n'
+            assignments = client.get_upcoming_assignments()
+            process_outputs['assignments']['output'] += f'Found {len(assignments)} upcoming assignments\n'
+
+            # Feature flag: ENABLE_ASSIGNMENT_PRIORITY_SCORING
+            if ENABLE_ASSIGNMENT_PRIORITY_SCORING:
+                process_outputs['assignments']['output'] += 'Scoring assignment priorities (AI-powered)...\n'
+                try:
+                    from services.ai_service import AssignmentPriorityScorer
+                    scorer = AssignmentPriorityScorer()
+                    scored = scorer.score_assignments(assignments, [])
+                    process_outputs['assignments']['output'] += f'Priority scores calculated for {len(scored)} assignments\n'
+                except Exception as e:
+                    process_outputs['assignments']['output'] += f'Priority scoring failed: {e}\n'
+
+            process_outputs['assignments']['output'] += '\n\u2713 Canvas API extraction completed!\n'
+
+        except Exception as e:
+            process_outputs['assignments']['output'] += f'\n\u2717 Error: {str(e)}\n'
+        finally:
+            process_outputs['assignments']['running'] = False
+
+    thread = threading.Thread(target=run_api_extraction)
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({'message': 'Canvas API extraction started'}), 202
+
+
 @app.route('/api/book-room', methods=['POST'])
 def book_room():
     """Execute book_room.py to book a study room"""
     if process_outputs['booking']['running']:
         return jsonify({'error': 'Room booking is already running'}), 400
+
+    # Feature flag: ENABLE_BULK_ROOM_BOOKING
+    if ENABLE_BULK_ROOM_BOOKING and request.json and request.json.get('bulk'):
+        return _handle_bulk_booking(request.json.get('bookings', []))
+
+    # Feature flag: ENABLE_RECURRING_BOOKINGS
+    if ENABLE_RECURRING_BOOKINGS and request.json and request.json.get('recurring'):
+        return _handle_recurring_booking(request.json)
+
+    # Feature flag: USE_NEW_SCHEDULING_ALGORITHM
+    if USE_NEW_SCHEDULING_ALGORITHM and request.json and request.json.get('auto_schedule'):
+        return _handle_auto_schedule(request.json)
 
     # Get optional config updates from request
     config_updates = request.json if request.json else {}
@@ -300,6 +565,53 @@ def book_room():
     thread.start()
 
     return jsonify({'message': 'Room booking started'}), 202
+
+
+def _handle_bulk_booking(bookings):
+    """Handle bulk room booking. Gated behind ENABLE_BULK_ROOM_BOOKING."""
+    if not ENABLE_BULK_ROOM_BOOKING:
+        return jsonify({'error': 'Bulk booking not enabled'}), 403
+
+    try:
+        from services.scheduling_service import BulkRoomBooker
+        booker = BulkRoomBooker()
+        results = booker.book_multiple(bookings)
+        return jsonify({'results': results}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def _handle_recurring_booking(config):
+    """Handle recurring booking. Gated behind ENABLE_RECURRING_BOOKINGS."""
+    if not ENABLE_RECURRING_BOOKINGS:
+        return jsonify({'error': 'Recurring bookings not enabled'}), 403
+
+    try:
+        from services.scheduling_service import RecurringBookingManager
+        manager = RecurringBookingManager()
+        recurring = manager.create_recurring(config.get('template', {}), config.get('recurrence', {}))
+        instances = manager.generate_instances(recurring)
+        return jsonify({'recurring_booking': recurring, 'instances': instances}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def _handle_auto_schedule(config):
+    """Handle auto-scheduling. Gated behind USE_NEW_SCHEDULING_ALGORITHM."""
+    if not USE_NEW_SCHEDULING_ALGORITHM:
+        return jsonify({'error': 'New scheduling algorithm not enabled'}), 403
+
+    try:
+        from services.scheduling_service import get_scheduler
+        scheduler = get_scheduler()
+        sessions = scheduler.schedule_study_sessions(
+            config.get('assignments', []),
+            config.get('members', []),
+            config.get('constraints', [])
+        )
+        return jsonify({'scheduled_sessions': sessions}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/plan-week', methods=['POST'])
@@ -662,9 +974,46 @@ if __name__ == '__main__':
     print("LBS STUDY GROUP MANAGER - WEB UI")
     print("=" * 80)
 
+    # Print active feature flags
+    print("\n--- Active Feature Flags ---")
+    flag_manager = get_flag_manager()
+    active_flags = flag_manager.get_all_flags()
+    enabled_count = sum(1 for f in active_flags.values() if f.get('enabled', False))
+    print(f"Total flags: {len(active_flags)}, Enabled: {enabled_count}")
+
     # Load AI configuration
     print("\nLoading AI configuration...")
     load_ai_config()
+
+    # Feature flag: Setup middleware
+    if ENABLE_RATE_LIMITING or ENABLE_REQUEST_LOGGING or ENABLE_PROMETHEUS_METRICS or ENABLE_SENTRY_INTEGRATION:
+        print("\nSetting up middleware...")
+        try:
+            from middleware.request_middleware import setup_middleware
+            middleware = setup_middleware(app)
+            print("✓ Middleware configured")
+        except Exception as e:
+            print(f"⚠ Middleware setup failed: {e}")
+
+    # Feature flag: Register mobile API
+    if ENABLE_MOBILE_API:
+        print("\nRegistering Mobile API endpoints...")
+        try:
+            from api.mobile_api import register_mobile_api
+            register_mobile_api(app)
+            print("✓ Mobile API registered at /api/v2/")
+        except Exception as e:
+            print(f"⚠ Mobile API registration failed: {e}")
+
+    # Feature flag: Register GraphQL API
+    if ENABLE_GRAPHQL_API:
+        print("\nRegistering GraphQL API endpoint...")
+        try:
+            from api.mobile_api import register_graphql_api
+            register_graphql_api(app)
+            print("✓ GraphQL API registered at /graphql")
+        except Exception as e:
+            print(f"⚠ GraphQL API registration failed: {e}")
 
     print("\nStarting Flask server...")
     print("Open your browser and navigate to: http://localhost:5000")

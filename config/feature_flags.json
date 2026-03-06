@@ -1,0 +1,537 @@
+{
+  "_metadata": {
+    "version": "3.2.1",
+    "last_updated": "2025-11-15T14:30:00Z",
+    "environment": "production",
+    "updated_by": "admin@london.edu"
+  },
+  "flags": {
+    "ENABLE_LEGACY_AUTH": {
+      "enabled": true,
+      "description": "Use legacy Microsoft ADFS authentication flow (deprecated - migrate to SAML SSO)",
+      "category": "authentication",
+      "created": "2023-01-15",
+      "owner": "auth-team",
+      "ticket": "AUTH-142",
+      "rollout_percentage": 100,
+      "notes": "Kept for backward compatibility with older browser sessions. Should be removed after Q1 2025."
+    },
+    "USE_SAML_SSO": {
+      "enabled": false,
+      "description": "Enable SAML-based Single Sign-On with Azure AD",
+      "category": "authentication",
+      "created": "2024-09-01",
+      "owner": "auth-team",
+      "ticket": "AUTH-891",
+      "rollout_percentage": 0,
+      "notes": "New SSO flow - pending security review"
+    },
+    "ENABLE_GOOGLE_AUTH": {
+      "enabled": false,
+      "description": "Allow Google OAuth2 login for external collaborators",
+      "category": "authentication",
+      "created": "2025-03-20",
+      "owner": "platform-team",
+      "ticket": "PLAT-234",
+      "rollout_percentage": 0
+    },
+    "USE_OAUTH2_PKCE": {
+      "enabled": false,
+      "description": "Use OAuth2 PKCE flow instead of implicit grant",
+      "category": "authentication",
+      "created": "2025-06-10",
+      "owner": "auth-team",
+      "ticket": "AUTH-1023",
+      "rollout_percentage": 0
+    },
+    "ENABLE_MFA_TOTP": {
+      "enabled": false,
+      "description": "Enable TOTP-based multi-factor authentication as alternative to Microsoft Authenticator",
+      "category": "authentication",
+      "created": "2025-01-05",
+      "owner": "security-team",
+      "ticket": "SEC-445",
+      "rollout_percentage": 0
+    },
+    "ENABLE_API_KEY_AUTH": {
+      "enabled": true,
+      "description": "Allow API key authentication for programmatic access",
+      "category": "authentication",
+      "created": "2024-06-15",
+      "owner": "api-team",
+      "ticket": "API-312",
+      "rollout_percentage": 100
+    },
+    "USE_JWT_TOKENS": {
+      "enabled": false,
+      "description": "Use JWT tokens instead of session cookies for API authentication",
+      "category": "authentication",
+      "created": "2025-07-01",
+      "owner": "auth-team",
+      "ticket": "AUTH-1100",
+      "rollout_percentage": 0
+    },
+    "LEGACY_COOKIE_FORMAT": {
+      "enabled": true,
+      "description": "Use legacy cookie serialization format (v1). New format uses encrypted cookies.",
+      "category": "authentication",
+      "created": "2022-11-01",
+      "owner": "auth-team",
+      "ticket": "AUTH-087",
+      "rollout_percentage": 100,
+      "notes": "DEPRECATED - should have been removed in 2024. Blocks migration to encrypted sessions."
+    },
+    "V1_SESSION_MANAGEMENT": {
+      "enabled": true,
+      "description": "Use v1 session management with file-based storage",
+      "category": "authentication",
+      "created": "2022-08-15",
+      "owner": "backend-team",
+      "ticket": "BE-201",
+      "rollout_percentage": 100,
+      "notes": "Legacy session handling. Redis-based sessions available behind USE_REDIS_SESSIONS flag."
+    },
+    "USE_REDIS_SESSIONS": {
+      "enabled": false,
+      "description": "Store sessions in Redis instead of filesystem",
+      "category": "infrastructure",
+      "created": "2025-04-01",
+      "owner": "infra-team",
+      "ticket": "INFRA-567",
+      "rollout_percentage": 0
+    },
+    "ENABLE_V1_DASHBOARD": {
+      "enabled": false,
+      "description": "Show the original v1 dashboard layout (replaced by v2 in Sept 2024)",
+      "category": "ui",
+      "created": "2023-02-01",
+      "owner": "frontend-team",
+      "ticket": "FE-110",
+      "rollout_percentage": 0,
+      "notes": "DEAD CODE - v1 dashboard components were deleted in commit abc123. Flag check remains but always returns false."
+    },
+    "ENABLE_V2_DASHBOARD": {
+      "enabled": true,
+      "description": "Use the redesigned v2 dashboard with card-based layout",
+      "category": "ui",
+      "created": "2024-09-15",
+      "owner": "frontend-team",
+      "ticket": "FE-445",
+      "rollout_percentage": 100
+    },
+    "ENABLE_V3_DASHBOARD_BETA": {
+      "enabled": false,
+      "description": "Beta: New v3 dashboard with real-time updates and drag-drop",
+      "category": "ui",
+      "created": "2025-10-01",
+      "owner": "frontend-team",
+      "ticket": "FE-890",
+      "rollout_percentage": 5
+    },
+    "ENABLE_DARK_MODE": {
+      "enabled": true,
+      "description": "Enable dark mode toggle in user preferences",
+      "category": "ui",
+      "created": "2025-02-14",
+      "owner": "frontend-team",
+      "ticket": "FE-567",
+      "rollout_percentage": 100
+    },
+    "AB_NEW_BOOKING_UI": {
+      "enabled": true,
+      "description": "A/B test: New streamlined room booking form with autocomplete",
+      "category": "experiment",
+      "created": "2025-08-01",
+      "owner": "product-team",
+      "ticket": "EXP-034",
+      "rollout_percentage": 50,
+      "variant": "B"
+    },
+    "AB_AI_MODEL_GPT4": {
+      "enabled": true,
+      "description": "A/B test: Use GPT-4o instead of GPT-3.5-turbo for weekly planning",
+      "category": "experiment",
+      "created": "2025-09-15",
+      "owner": "ai-team",
+      "ticket": "EXP-041",
+      "rollout_percentage": 30
+    },
+    "AB_WEEKLY_DIGEST_EMAIL": {
+      "enabled": false,
+      "description": "A/B test: Send weekly digest emails to study group members",
+      "category": "experiment",
+      "created": "2025-07-20",
+      "owner": "product-team",
+      "ticket": "EXP-028",
+      "rollout_percentage": 0,
+      "notes": "Experiment concluded - digest emails showed no engagement lift. Remove flag."
+    },
+    "USE_OPENAI_DIRECT": {
+      "enabled": false,
+      "description": "Use OpenAI API directly instead of Azure OpenAI endpoint",
+      "category": "ai",
+      "created": "2025-05-10",
+      "owner": "ai-team",
+      "ticket": "AI-178",
+      "rollout_percentage": 0
+    },
+    "ENABLE_LOCAL_LLM_FALLBACK": {
+      "enabled": false,
+      "description": "Fall back to local Ollama LLM when cloud API is unavailable",
+      "category": "ai",
+      "created": "2025-11-01",
+      "owner": "ai-team",
+      "ticket": "AI-245",
+      "rollout_percentage": 0
+    },
+    "ENABLE_AI_STUDY_RECOMMENDATIONS": {
+      "enabled": true,
+      "description": "Use AI to generate personalized study recommendations based on member backgrounds",
+      "category": "ai",
+      "created": "2025-04-15",
+      "owner": "ai-team",
+      "ticket": "AI-156",
+      "rollout_percentage": 100
+    },
+    "ENABLE_AI_CONFLICT_RESOLUTION": {
+      "enabled": false,
+      "description": "AI-powered scheduling conflict resolution and suggestion system",
+      "category": "ai",
+      "created": "2025-09-20",
+      "owner": "ai-team",
+      "ticket": "AI-230",
+      "rollout_percentage": 10
+    },
+    "USE_SOAP_API": {
+      "enabled": false,
+      "description": "Use SOAP-based API for room availability check (replaced by REST API in 2024)",
+      "category": "integration",
+      "created": "2022-03-01",
+      "owner": "backend-team",
+      "ticket": "BE-045",
+      "rollout_percentage": 0,
+      "notes": "DEAD FLAG - SOAP endpoint was decommissioned in March 2024. All references should be removed."
+    },
+    "USE_LEGACY_ROOM_API": {
+      "enabled": false,
+      "description": "Use the old room booking API v1 (XML-based responses)",
+      "category": "integration",
+      "created": "2023-04-10",
+      "owner": "backend-team",
+      "ticket": "BE-312",
+      "rollout_percentage": 0,
+      "notes": "Legacy API. New REST API is default since v2.0."
+    },
+    "ENABLE_SOAP_CALENDAR_SYNC": {
+      "enabled": false,
+      "description": "Sync calendar events via SOAP API to Exchange server",
+      "category": "integration",
+      "created": "2022-06-20",
+      "owner": "integration-team",
+      "ticket": "INT-089",
+      "rollout_percentage": 0,
+      "notes": "DEPRECATED - Exchange SOAP API sunsetted. Use Microsoft Graph API instead (ENABLE_GRAPH_CALENDAR_SYNC)."
+    },
+    "ENABLE_GRAPH_CALENDAR_SYNC": {
+      "enabled": false,
+      "description": "Sync calendar events via Microsoft Graph API",
+      "category": "integration",
+      "created": "2025-01-10",
+      "owner": "integration-team",
+      "ticket": "INT-234",
+      "rollout_percentage": 0
+    },
+    "ENABLE_GOOGLE_CALENDAR_SYNC": {
+      "enabled": false,
+      "description": "Sync study sessions to Google Calendar",
+      "category": "integration",
+      "created": "2025-06-01",
+      "owner": "integration-team",
+      "ticket": "INT-301",
+      "rollout_percentage": 0
+    },
+    "ENABLE_SLACK_NOTIFICATIONS": {
+      "enabled": true,
+      "description": "Send notifications to Slack channel for study group events",
+      "category": "notifications",
+      "created": "2025-03-01",
+      "owner": "platform-team",
+      "ticket": "PLAT-189",
+      "rollout_percentage": 100
+    },
+    "ENABLE_EMAIL_NOTIFICATIONS": {
+      "enabled": true,
+      "description": "Send email notifications for assignments and bookings",
+      "category": "notifications",
+      "created": "2024-01-15",
+      "owner": "platform-team",
+      "ticket": "PLAT-098",
+      "rollout_percentage": 100
+    },
+    "ENABLE_DEPRECATED_NOTIFICATIONS": {
+      "enabled": false,
+      "description": "Use deprecated SMS notification gateway (Twilio legacy account)",
+      "category": "notifications",
+      "created": "2023-03-01",
+      "owner": "platform-team",
+      "ticket": "PLAT-056",
+      "rollout_percentage": 0,
+      "notes": "SMS gateway contract expired Dec 2024. Remove all SMS notification code."
+    },
+    "ENABLE_PUSH_NOTIFICATIONS": {
+      "enabled": false,
+      "description": "Browser push notifications for real-time updates",
+      "category": "notifications",
+      "created": "2025-08-15",
+      "owner": "frontend-team",
+      "ticket": "FE-723",
+      "rollout_percentage": 0
+    },
+    "ENABLE_WHATSAPP_NOTIFICATIONS": {
+      "enabled": false,
+      "description": "Send WhatsApp notifications via Twilio API",
+      "category": "notifications",
+      "created": "2025-10-20",
+      "owner": "platform-team",
+      "ticket": "PLAT-445",
+      "rollout_percentage": 0
+    },
+    "LEGACY_MEMBER_SYNC": {
+      "enabled": false,
+      "description": "Use legacy CSV-based member synchronization from Canvas LMS",
+      "category": "data",
+      "created": "2023-01-01",
+      "owner": "backend-team",
+      "ticket": "BE-178",
+      "rollout_percentage": 0,
+      "notes": "Replaced by Canvas API integration. CSV sync code can be removed."
+    },
+    "ENABLE_REAL_TIME_COLLABORATION": {
+      "enabled": false,
+      "description": "WebSocket-based real-time collaboration on study plans",
+      "category": "feature",
+      "created": "2025-07-15",
+      "owner": "backend-team",
+      "ticket": "BE-567",
+      "rollout_percentage": 0
+    },
+    "USE_NEW_SCHEDULING_ALGORITHM": {
+      "enabled": false,
+      "description": "Use the new constraint-satisfaction scheduling algorithm for room bookings",
+      "category": "feature",
+      "created": "2025-06-20",
+      "owner": "ai-team",
+      "ticket": "AI-198",
+      "rollout_percentage": 15
+    },
+    "ENABLE_MOBILE_API": {
+      "enabled": false,
+      "description": "Enable REST API endpoints for mobile app consumption",
+      "category": "api",
+      "created": "2025-05-01",
+      "owner": "api-team",
+      "ticket": "API-401",
+      "rollout_percentage": 0
+    },
+    "ENABLE_GRAPHQL_API": {
+      "enabled": false,
+      "description": "Enable GraphQL API endpoint as alternative to REST",
+      "category": "api",
+      "created": "2025-09-01",
+      "owner": "api-team",
+      "ticket": "API-512",
+      "rollout_percentage": 0
+    },
+    "ENABLE_ANALYTICS_DASHBOARD": {
+      "enabled": false,
+      "description": "Show analytics dashboard with study group performance metrics",
+      "category": "feature",
+      "created": "2025-04-01",
+      "owner": "product-team",
+      "ticket": "PROD-234",
+      "rollout_percentage": 0
+    },
+    "ENABLE_EXPORT_TO_PDF": {
+      "enabled": true,
+      "description": "Allow exporting weekly plans and reports to PDF",
+      "category": "feature",
+      "created": "2025-02-01",
+      "owner": "frontend-team",
+      "ticket": "FE-501",
+      "rollout_percentage": 100
+    },
+    "ENABLE_BULK_ROOM_BOOKING": {
+      "enabled": false,
+      "description": "Allow booking multiple rooms in a single transaction",
+      "category": "feature",
+      "created": "2025-08-10",
+      "owner": "backend-team",
+      "ticket": "BE-623",
+      "rollout_percentage": 0
+    },
+    "ENABLE_RECURRING_BOOKINGS": {
+      "enabled": false,
+      "description": "Support recurring weekly room bookings",
+      "category": "feature",
+      "created": "2025-09-05",
+      "owner": "backend-team",
+      "ticket": "BE-645",
+      "rollout_percentage": 0
+    },
+    "USE_REDIS_CACHE": {
+      "enabled": false,
+      "description": "Use Redis for caching API responses and session data",
+      "category": "infrastructure",
+      "created": "2025-03-15",
+      "owner": "infra-team",
+      "ticket": "INFRA-345",
+      "rollout_percentage": 0
+    },
+    "ENABLE_RATE_LIMITING": {
+      "enabled": true,
+      "description": "Enable API rate limiting (100 req/min per user)",
+      "category": "infrastructure",
+      "created": "2024-11-01",
+      "owner": "infra-team",
+      "ticket": "INFRA-234",
+      "rollout_percentage": 100
+    },
+    "ENABLE_REQUEST_LOGGING": {
+      "enabled": true,
+      "description": "Log all API requests with timing and metadata",
+      "category": "observability",
+      "created": "2024-08-15",
+      "owner": "infra-team",
+      "ticket": "INFRA-189",
+      "rollout_percentage": 100
+    },
+    "ENABLE_PROMETHEUS_METRICS": {
+      "enabled": false,
+      "description": "Export application metrics in Prometheus format",
+      "category": "observability",
+      "created": "2025-06-15",
+      "owner": "infra-team",
+      "ticket": "INFRA-412",
+      "rollout_percentage": 0
+    },
+    "ENABLE_SENTRY_INTEGRATION": {
+      "enabled": true,
+      "description": "Send error reports to Sentry for monitoring",
+      "category": "observability",
+      "created": "2024-10-01",
+      "owner": "infra-team",
+      "ticket": "INFRA-210",
+      "rollout_percentage": 100
+    },
+    "DEBUG_SQL_QUERIES": {
+      "enabled": false,
+      "description": "Log all SQL queries with execution time (development only)",
+      "category": "debug",
+      "created": "2024-05-01",
+      "owner": "backend-team",
+      "ticket": "BE-445",
+      "rollout_percentage": 0
+    },
+    "ENABLE_OLD_REPORT_FORMAT": {
+      "enabled": false,
+      "description": "Generate reports in the old verbose markdown format (pre-minification)",
+      "category": "feature",
+      "created": "2023-06-01",
+      "owner": "backend-team",
+      "ticket": "BE-256",
+      "rollout_percentage": 0,
+      "notes": "Old format was 3x larger. Minified format is default since v2.1. Remove this flag."
+    },
+    "ENABLE_CANVAS_LMS_INTEGRATION": {
+      "enabled": true,
+      "description": "Direct integration with Canvas LMS API for assignment sync",
+      "category": "integration",
+      "created": "2024-07-01",
+      "owner": "integration-team",
+      "ticket": "INT-178",
+      "rollout_percentage": 100
+    },
+    "USE_HEADLESS_BROWSER": {
+      "enabled": false,
+      "description": "Run Selenium in headless mode for server-side extraction",
+      "category": "infrastructure",
+      "created": "2024-03-01",
+      "owner": "backend-team",
+      "ticket": "BE-389",
+      "rollout_percentage": 0
+    },
+    "ENABLE_ASSIGNMENT_PRIORITY_SCORING": {
+      "enabled": true,
+      "description": "AI-based assignment priority scoring using member expertise matching",
+      "category": "ai",
+      "created": "2025-05-20",
+      "owner": "ai-team",
+      "ticket": "AI-189",
+      "rollout_percentage": 100
+    },
+    "ENABLE_STUDY_STREAK_TRACKING": {
+      "enabled": false,
+      "description": "Track and gamify study session streaks for motivation",
+      "category": "feature",
+      "created": "2025-10-15",
+      "owner": "product-team",
+      "ticket": "PROD-389",
+      "rollout_percentage": 0
+    },
+    "ENABLE_PEER_REVIEW_SYSTEM": {
+      "enabled": false,
+      "description": "Allow study group members to peer-review each other's work before submission",
+      "category": "feature",
+      "created": "2025-11-01",
+      "owner": "product-team",
+      "ticket": "PROD-412",
+      "rollout_percentage": 0
+    },
+    "USE_LEGACY_WEBSCRAPER": {
+      "enabled": true,
+      "description": "Use the Selenium-based web scraper for data extraction (v1)",
+      "category": "data",
+      "created": "2023-01-01",
+      "owner": "backend-team",
+      "ticket": "BE-001",
+      "rollout_percentage": 100,
+      "notes": "Original scraper. Canvas API integration (ENABLE_CANVAS_LMS_INTEGRATION) should replace this."
+    },
+    "ENABLE_MULTI_LANGUAGE_SUPPORT": {
+      "enabled": false,
+      "description": "Support multiple languages in the UI (i18n)",
+      "category": "ui",
+      "created": "2025-08-20",
+      "owner": "frontend-team",
+      "ticket": "FE-756",
+      "rollout_percentage": 0
+    },
+    "ENABLE_ACCESSIBILITY_MODE": {
+      "enabled": false,
+      "description": "Enhanced accessibility features (screen reader support, high contrast)",
+      "category": "ui",
+      "created": "2025-07-01",
+      "owner": "frontend-team",
+      "ticket": "FE-689",
+      "rollout_percentage": 0
+    },
+    "ENABLE_FILE_SHARING": {
+      "enabled": false,
+      "description": "Allow study group members to share files within the platform",
+      "category": "feature",
+      "created": "2025-09-10",
+      "owner": "backend-team",
+      "ticket": "BE-678",
+      "rollout_percentage": 0
+    },
+    "ENABLE_VIDEO_CONFERENCING": {
+      "enabled": false,
+      "description": "Integrated video conferencing for remote study sessions (Jitsi-based)",
+      "category": "feature",
+      "created": "2025-10-05",
+      "owner": "platform-team",
+      "ticket": "PLAT-401",
+      "rollout_percentage": 0
+    }
+  }
+}

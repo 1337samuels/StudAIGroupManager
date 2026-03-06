@@ -9,3 +9,43 @@ Werkzeug>=3.0.1
 
 # AI API dependencies
 openai>=1.12.0
+
+# Caching (feature flag: USE_REDIS_CACHE)
+redis>=5.0.0
+
+# Notifications (feature flags: ENABLE_SLACK_NOTIFICATIONS, ENABLE_EMAIL_NOTIFICATIONS, etc.)
+slack-sdk>=3.27.0
+sendgrid>=6.11.0
+twilio>=9.0.0  # DEPRECATED: SMS gateway expired Dec 2024
+
+# Monitoring & Observability (feature flags: ENABLE_SENTRY_INTEGRATION, ENABLE_PROMETHEUS_METRICS)
+sentry-sdk[flask]>=1.40.0
+prometheus-client>=0.20.0
+
+# Authentication (feature flags: USE_SAML_SSO, ENABLE_MFA_TOTP, USE_JWT_TOKENS)
+python3-saml>=1.16.0
+pyotp>=2.9.0
+PyJWT>=2.8.0
+
+# Calendar integrations (feature flags: ENABLE_GRAPH_CALENDAR_SYNC, ENABLE_GOOGLE_CALENDAR_SYNC)
+msgraph-core>=1.0.0
+google-api-python-client>=2.100.0
+google-auth-oauthlib>=1.2.0
+
+# PDF export (feature flag: ENABLE_EXPORT_TO_PDF)
+reportlab>=4.0.0
+weasyprint>=60.0
+
+# GraphQL (feature flag: ENABLE_GRAPHQL_API)
+graphene>=3.3.0
+flask-graphql>=2.0.1
+
+# Real-time collaboration (feature flag: ENABLE_REAL_TIME_COLLABORATION)
+flask-socketio>=5.3.0
+python-socketio>=5.10.0
+
+# Video conferencing (feature flag: ENABLE_VIDEO_CONFERENCING)
+# Uses Jitsi Meet API (no Python package needed, JS integration)
+
+# Canvas LMS (feature flag: ENABLE_CANVAS_LMS_INTEGRATION)
+canvasapi>=3.2.0
