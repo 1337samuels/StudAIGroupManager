@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-LBS Room Booking Script
-Automatically books rooms on lbsmobile.london.edu based on configuration file
-"""
+"""LBS Room Booking Script - books rooms on lbsmobile.london.edu"""
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -17,17 +14,11 @@ import os
 
 # Feature flag imports
 from config.feature_flags import (
-    USE_HEADLESS_BROWSER,
-    ENABLE_LEGACY_AUTH,
-    USE_SAML_SSO,
-    AB_NEW_BOOKING_UI,
-    USE_NEW_SCHEDULING_ALGORITHM,
-    ENABLE_BULK_ROOM_BOOKING,
-    ENABLE_RECURRING_BOOKINGS,
-    USE_LEGACY_ROOM_API,
-    ENABLE_SLACK_NOTIFICATIONS,
-    ENABLE_EMAIL_NOTIFICATIONS,
-    ENABLE_GRAPH_CALENDAR_SYNC,
+    USE_HEADLESS_BROWSER, ENABLE_LEGACY_AUTH, USE_SAML_SSO,
+    AB_NEW_BOOKING_UI, USE_NEW_SCHEDULING_ALGORITHM,
+    ENABLE_BULK_ROOM_BOOKING, ENABLE_RECURRING_BOOKINGS,
+    USE_LEGACY_ROOM_API, ENABLE_SLACK_NOTIFICATIONS,
+    ENABLE_EMAIL_NOTIFICATIONS, ENABLE_GRAPH_CALENDAR_SYNC,
     is_flag_enabled,
 )
 
@@ -37,48 +28,34 @@ class RoomBooker:
         self.driver = None
         self.config = self.load_config(config_file)
 
-    # ==================== CONFIG MANAGEMENT ====================
-
     def load_config(self, config_file):
-        """Load booking configuration from JSON file"""
+        """Load booking configuration from JSON file."""
         try:
             with open(config_file, 'r') as f:
                 config = json.load(f)
-            print(f"✓ Loaded configuration from {config_file}")
-            print(f"  Date: {config['booking_date']}")
-            print(f"  Time: {config['start_time']}")
-            print(f"  Duration: {config['duration_hours']} hours")
-            print(f"  Attendees: {config['attendees']}")
-            print(f"  Building: {config['building']}")
+            print(f"Loaded config: {config['booking_date']} {config['start_time']}")
             return config
         except Exception as e:
-            print(f"✗ Error loading config file: {e}")
+            print(f"Error loading config: {e}")
             raise
 
     # ==================== SELENIUM SETUP ====================
 
     def setup_driver(self):
-        """Initialize Selenium WebDriver with Chrome"""
+        """Initialize Selenium WebDriver with Chrome."""
         # Feature flag: USE_LEGACY_ROOM_API - Use SOAP/XML API instead of browser
         if USE_LEGACY_ROOM_API:
-            print("LEGACY: Using SOAP/XML room booking API")
-            print("WARNING: This API was decommissioned. Booking will fail.")
-            # Dead code path - SOAP endpoints no longer exist
+            print("LEGACY: Using SOAP/XML room booking API (DECOMMISSIONED)")
             return False
-
-        print("Setting up Chrome WebDriver...")
 
         options = webdriver.ChromeOptions()
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-blink-features=AutomationControlled')
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
-        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
 
         # Feature flag: USE_HEADLESS_BROWSER
         if USE_HEADLESS_BROWSER:
-            print("Running in headless mode (USE_HEADLESS_BROWSER=true)")
             options.add_argument('--headless=new')
             options.add_argument('--window-size=1920,1080')
 
@@ -86,484 +63,247 @@ class RoomBooker:
             self.driver = webdriver.Chrome(options=options)
             if not USE_HEADLESS_BROWSER:
                 self.driver.maximize_window()
-            print("✓ Chrome WebDriver initialized")
             return True
         except Exception as e:
-            print(f"✗ Failed to initialize Chrome WebDriver: {e}")
+            print(f"Failed to init WebDriver: {e}")
             return False
-
-    # ==================== COOKIE MANAGEMENT ====================
-    # Session management removed - fresh login required each time
 
     # ==================== LOGIN ====================
 
     def wait_for_manual_login(self, initial_url, timeout=300):
-        """Navigate to URL and wait for user to manually complete login"""
+        """Navigate to URL and wait for user to complete login."""
         try:
-            print(f"\n{'='*60}")
-            print("MANUAL LOGIN REQUIRED")
-            print('='*60)
-            print(f"\n📱 Opening browser to: {initial_url}")
-            print("\nPlease complete the following steps:")
-            print("  1. Wait for Sign In button to be clicked automatically")
-            print("  2. Enter your Microsoft credentials")
-            print("  3. Complete MFA (Microsoft Authenticator)")
-            print("  4. Wait for the page to fully load after login")
-            print(f"\nTimeout: {timeout} seconds")
-            print('='*60)
-
             self.driver.get(initial_url)
-            time.sleep(3)  # Wait for initial page load
-
-            # Check if we're on the login page (with Sign In button)
-            print("\nChecking for 'Sign In' button...")
+            time.sleep(3)
+            # Auto-click Sign In button if present
             try:
                 sign_in_btn = WebDriverWait(self.driver, 5).until(
-                    EC.element_to_be_clickable((By.ID, "signInSignOut"))
-                )
-                # Check if the button says "Sign In" (not "Sign Out")
+                    EC.element_to_be_clickable((By.ID, "signInSignOut")))
                 if "Sign In" in sign_in_btn.text:
-                    print("✓ Found 'Sign In' button - clicking to initiate Microsoft login...")
                     sign_in_btn.click()
                     time.sleep(2)
-                    print("✓ Redirecting to Microsoft login page...")
-                else:
-                    print("  Already signed in, skipping...")
-            except TimeoutException:
-                print("  No Sign In button found - might already be logged in or redirected")
-            except Exception as e:
-                print(f"  Note: Could not click Sign In button: {e}")
+            except (TimeoutException, Exception):
+                pass
 
             start_time = time.time()
-            check_interval = 2
-
-            print("\n⏳ Waiting for you to complete Microsoft MFA login...")
-
             while (time.time() - start_time) < timeout:
-                try:
-                    current_url = self.driver.current_url.lower()
-
-                    # Check if we're successfully logged in
-                    # Only check URL - don't try to access page elements during auth flow
-                    if 'lbsmobile.london.edu' in current_url:
-                        if not any(word in current_url for word in ['login', 'auth', 'microsoft', 'saml']):
-                            print("\n✓ Login successful!")
-                            print(f"  Current URL: {self.driver.current_url}")
-                            # Give the page a moment to fully load after login
-                            time.sleep(2)
-                            return True
-
-                    elapsed = int(time.time() - start_time)
-                    if elapsed % 10 == 0 and elapsed > 0:
-                        print(f"  Still waiting... ({elapsed}s elapsed)")
-
-                    time.sleep(check_interval)
-
-                except Exception as e:
-                    print(f"  Warning during wait: {e}")
-                    time.sleep(check_interval)
-
-            print(f"\n⚠ Timeout after {timeout} seconds")
-
-            current_url = self.driver.current_url
-            print(f"  Current URL: {current_url}")
-
-            if 'lbsmobile.london.edu' in current_url:
-                print("\n  You appear to be on the target site. Continuing...")
-                return True
-
-            return False
-
-        except Exception as e:
-            print(f"\n✗ Error during manual login wait: {e}")
+                current_url = self.driver.current_url.lower()
+                if 'lbsmobile.london.edu' in current_url:
+                    if not any(w in current_url for w in ['login', 'auth', 'microsoft', 'saml']):
+                        time.sleep(2)
+                        return True
+                time.sleep(2)
+            return 'lbsmobile.london.edu' in self.driver.current_url
+        except Exception:
             return False
 
     def login(self):
-        """Login to lbsmobile.london.edu"""
-        print("="*80)
-        print("STEP 1: LOGIN TO LBSMOBILE.LONDON.EDU")
-        print("="*80)
-
-        # Feature flag: ENABLE_LEGACY_AUTH - deprecated ADFS auth path
+        """Login to lbsmobile.london.edu."""
+        # Feature flag: ENABLE_LEGACY_AUTH
         if ENABLE_LEGACY_AUTH:
-            print("\nUsing legacy ADFS authentication (ENABLE_LEGACY_AUTH=true)")
-            print("WARNING: ADFS auth is deprecated. Migrate to SAML SSO.")
-
+            print("Using legacy ADFS authentication (DEPRECATED)")
         # Feature flag: USE_SAML_SSO
         if USE_SAML_SSO:
-            print("\nUsing SAML SSO for room booking authentication (USE_SAML_SSO=true)")
-            print("Redirecting through Azure AD SAML flow...")
+            print("Using SAML SSO for room booking (USE_SAML_SSO=true)")
 
         if not self.setup_driver():
             return False
-
-        # Perform manual login
-        print("\nProceeding with manual login...")
         if not self.wait_for_manual_login("https://lbsmobile.london.edu"):
             return False
-
         return True
 
     # ==================== NAVIGATION ====================
 
     def navigate_to_bookings(self):
-        """Click on 'My Bookings' from main page"""
-        print("\n" + "="*80)
-        print("STEP 2: NAVIGATE TO MY BOOKINGS")
-        print("="*80)
-
+        """Click on My Bookings from main page."""
         try:
-            print("\nWaiting for main page to load...")
             time.sleep(3)
-
-            # Click on "My Bookings" button
-            print("Clicking 'My Bookings' button...")
-            my_bookings_btn = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.ID, "userBookings"))
-            )
-            my_bookings_btn.click()
+            btn = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.ID, "userBookings")))
+            btn.click()
             time.sleep(2)
-
-            print("✓ Navigated to My Bookings page")
             return True
-
         except Exception as e:
-            print(f"✗ Error navigating to bookings: {e}")
+            print(f"Error navigating to bookings: {e}")
             return False
 
     def click_book_room(self):
-        """Click on 'Book Room' button"""
-        print("\n" + "="*80)
-        print("STEP 3: CLICK BOOK ROOM")
-        print("="*80)
-
+        """Click on Book Room button."""
         try:
-            print("\nLooking for 'Book Room' button...")
-            book_room_btn = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.CLASS_NAME, "toBookingPage"))
-            )
-            book_room_btn.click()
+            btn = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.CLASS_NAME, "toBookingPage")))
+            btn.click()
             time.sleep(2)
-
-            print("✓ Clicked 'Book Room' button")
             return True
-
         except Exception as e:
-            print(f"✗ Error clicking Book Room: {e}")
+            print(f"Error clicking Book Room: {e}")
             return False
 
     # ==================== FORM FILLING ====================
 
     def fill_booking_form(self):
-        """Fill out the new booking form with config values"""
-        print("\n" + "="*80)
-        print("STEP 4: FILL BOOKING FORM")
-        print("="*80)
-
+        """Fill out the booking form with config values."""
         # Feature flag: AB_NEW_BOOKING_UI - A/B test new booking interface
         if AB_NEW_BOOKING_UI:
             print("A/B Test: Using NEW booking form UI (AB_NEW_BOOKING_UI=true)")
-            print("New UI has improved date picker and room preview")
-            # In production, this would render a different form
 
         try:
-            # Wait for form to load
-            print("\nWaiting for booking form to load...")
             WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.ID, "bookingdatepicker"))
-            )
+                EC.presence_of_element_located((By.ID, "bookingdatepicker")))
             time.sleep(2)
 
-            # Fill Booking Date using JavaScript (datepicker is readonly)
-            print(f"\nSetting booking date to {self.config['booking_date']}...")
+            # Set date
             date_obj = datetime.strptime(self.config['booking_date'], '%Y-%m-%d')
-            date_formatted = date_obj.strftime('%d/%m/%Y')  # Format as DD/MM/YYYY for UK format
-
+            date_formatted = date_obj.strftime('%d/%m/%Y')
             self.driver.execute_script(
-                f"document.getElementById('bookingdatepicker').value = '{date_formatted}';"
-            )
-            print(f"✓ Date set to {date_formatted}")
+                f"document.getElementById('bookingdatepicker').value = '{date_formatted}';")
 
-            # Fill Start Time
-            print(f"\nSetting start time to {self.config['start_time']}...")
+            # Set time
             hour, minute = self.config['start_time'].split(':')
+            Select(self.driver.find_element(By.ID, "starthourbox")).select_by_value(hour)
+            Select(self.driver.find_element(By.ID, "startminutesbox")).select_by_value(minute)
 
-            # Select hour
-            hour_select = Select(self.driver.find_element(By.ID, "starthourbox"))
-            hour_select.select_by_value(hour)
-            print(f"  ✓ Hour set to {hour}")
-
-            # Select minute
-            minute_select = Select(self.driver.find_element(By.ID, "startminutesbox"))
-            minute_select.select_by_value(minute)
-            print(f"  ✓ Minute set to {minute}")
-
-            # Fill Duration (convert hours to minutes)
-            print(f"\nSetting duration to {self.config['duration_hours']} hours...")
+            # Set duration
             duration_minutes = str(self.config['duration_hours'] * 60)
-            duration_select = Select(self.driver.find_element(By.ID, "durationbox"))
-            duration_select.select_by_value(duration_minutes)
-            print(f"✓ Duration set to {duration_minutes} minutes ({self.config['duration_hours']} hours)")
+            Select(self.driver.find_element(By.ID, "durationbox")).select_by_value(duration_minutes)
 
-            # Set Number of Attendees using JavaScript (it's a slider)
-            print(f"\nSetting attendees to {self.config['attendees']}...")
+            # Set attendees
             self.driver.execute_script(
-                f"document.getElementById('noofattendees').value = {self.config['attendees']};"
-            )
-            # Trigger change event to update UI
+                f"document.getElementById('noofattendees').value = {self.config['attendees']};")
             self.driver.execute_script(
-                "document.getElementById('noofattendees').dispatchEvent(new Event('change'));"
-            )
-            print(f"✓ Attendees set to {self.config['attendees']}")
+                "document.getElementById('noofattendees').dispatchEvent(new Event('change'));")
 
-            # Fill Booking Title
-            print(f"\nSetting booking title...")
+            # Set title
             booking_title = f"{self.config['study_group_name']} - {self.config['project_name']}"
             title_input = self.driver.find_element(By.ID, "meetingTitlebox")
             title_input.clear()
             title_input.send_keys(booking_title)
-            print(f"✓ Booking title set to '{booking_title}'")
 
-            # Select Building
-            print(f"\nSelecting building: {self.config['building']}...")
-            building_map = {
-                "North Building": "NB",
-                "Sammy Ofer Centre": "SOC",
-                "Sussex Place": "Susx Plc"
-            }
-            building_code = building_map.get(self.config['building'], "Susx Plc")
+            # Select building
+            building_map = {'North Building': 'NB', 'Sammy Ofer Centre': 'SOC', 'Sussex Place': 'Susx Plc'}
+            building_code = building_map.get(self.config['building'], 'Susx Plc')
+            Select(self.driver.find_element(By.ID, "sitebox")).select_by_value(building_code)
 
-            building_select = Select(self.driver.find_element(By.ID, "sitebox"))
-            building_select.select_by_value(building_code)
-            print(f"✓ Building set to {self.config['building']} ({building_code})")
-
-            # Submit the form
-            print("\nSubmitting booking form...")
+            # Submit
             time.sleep(1)
-            submit_btn = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit'].lbs-btn-default")
-            submit_btn.click()
+            self.driver.find_element(By.CSS_SELECTOR, "button[type='submit'].lbs-btn-default").click()
             time.sleep(3)
-
-            print("✓ Form submitted - waiting for available rooms...")
             return True
-
         except Exception as e:
-            print(f"✗ Error filling booking form: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"Error filling form: {e}")
             return False
 
     # ==================== ROOM SELECTION ====================
 
     def select_and_book_room(self):
-        """Wait for available rooms page, select first room, and book it"""
-        print("\n" + "="*80)
-        print("STEP 5: SELECT AND BOOK ROOM")
-        print("="*80)
-
+        """Select first available room and book it."""
         try:
-            # Wait a few seconds for the page to load the rooms
-            print("\nWaiting for available rooms to load...")
-            time.sleep(5)  # Give extra time as mentioned in requirements
-
-            # Wait for the available rooms container
+            time.sleep(5)
             WebDriverWait(self.driver, 15).until(
-                EC.presence_of_element_located((By.ID, "availblerooms"))
-            )
-
-            # Find all room radio buttons
-            print("Looking for available rooms...")
+                EC.presence_of_element_located((By.ID, "availblerooms")))
             room_radios = self.driver.find_elements(By.CSS_SELECTOR, "input.selectedRoom")
-
             if not room_radios:
-                print("✗ No available rooms found!")
+                print("No available rooms found!")
                 return False
 
-            print(f"✓ Found {len(room_radios)} available rooms")
-
-            # Get the label for the first room to see its name
             first_room = room_radios[0]
             room_id = first_room.get_attribute('id')
-
-            try:
-                room_label = self.driver.find_element(By.CSS_SELECTOR, f"label[for='{room_id}']")
-                room_name = room_label.text
-                print(f"\nSelecting first available room: {room_name}")
-            except:
-                print(f"\nSelecting first available room (ID: {room_id})")
-
-            # Click the first room radio button
             self.driver.execute_script("arguments[0].click();", first_room)
             time.sleep(1)
 
-            # Click the Book button
-            print("\nClicking 'Book' button...")
             book_btn = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.ID, "bookButton"))
-            )
+                EC.element_to_be_clickable((By.ID, "bookButton")))
             book_btn.click()
             time.sleep(3)
 
-            # Check for success or failure
-            print("\nChecking booking result...")
-            current_url = self.driver.current_url
-
-            if 'bookingSuccessfulDialog' in current_url or 'bookingSuccessfulDialog' in self.driver.page_source:
-                print("\n" + "="*80)
-                print("✓ BOOKING SUCCESSFUL!")
-                print("="*80)
-                print(f"Room booked: {room_name if 'room_name' in locals() else room_id}")
-                print(f"Date: {self.config['booking_date']}")
-                print(f"Time: {self.config['start_time']}")
-                print(f"Duration: {self.config['duration_hours']} hours")
-                print(f"Title: {self.config['study_group_name']} - {self.config['project_name']}")
+            if 'bookingSuccessfulDialog' in self.driver.page_source:
+                print("BOOKING SUCCESSFUL!")
                 return True
-            elif 'bookingFailedDialog' in current_url or 'bookingFailedDialog' in self.driver.page_source:
-                print("\n✗ BOOKING FAILED!")
-                try:
-                    error_msg = self.driver.find_element(By.ID, "failedBookingMessage").text
-                    print(f"Error message: {error_msg}")
-                except:
-                    print("Could not retrieve error message")
+            elif 'bookingFailedDialog' in self.driver.page_source:
+                print("BOOKING FAILED!")
                 return False
-            else:
-                print("\n⚠ Booking status unclear - please check the browser")
-                return True  # Assume success if no clear failure
-
+            return True  # Assume success if unclear
         except Exception as e:
-            print(f"\n✗ Error selecting and booking room: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"Error booking room: {e}")
             return False
 
-    # ==================== MAIN WORKFLOW ====================
+    # ==================== POST-BOOKING ====================
 
     def _send_booking_notifications(self, room_name):
         """Send notifications after successful booking."""
         if ENABLE_SLACK_NOTIFICATIONS:
-            print("\nSending Slack notification about booking...")
             try:
                 from services.notification_service import SlackNotifier
-                slack = SlackNotifier()
-                slack.send(
-                    f"Room booked: {room_name} on {self.config['booking_date']} "
-                    f"at {self.config['start_time']} for {self.config['duration_hours']}h"
-                )
-                print("✓ Slack notification sent")
-            except Exception as e:
-                print(f"  Slack notification failed: {e}")
-
+                SlackNotifier().send(
+                    f"Room booked: {room_name} on {self.config['booking_date']} at {self.config['start_time']}")
+            except Exception:
+                pass
         if ENABLE_EMAIL_NOTIFICATIONS:
-            print("\nSending email confirmation...")
             try:
                 from services.notification_service import EmailNotifier
-                email_notifier = EmailNotifier()
-                email_notifier.send(
+                EmailNotifier().send(
                     to='team@london.edu',
-                    subject=f"Room Booked: {room_name}",
-                    body=f"Your room {room_name} has been booked for {self.config['booking_date']}.",
-                )
-                print("✓ Email confirmation sent")
-            except Exception as e:
-                print(f"  Email notification failed: {e}")
+                    subject=f'Room Booked: {room_name}',
+                    body=f"Room {room_name} booked for {self.config['booking_date']}.")
+            except Exception:
+                pass
 
     def _sync_booking_to_calendar(self, room_name):
         """Sync booking to external calendar if enabled."""
         if ENABLE_GRAPH_CALENDAR_SYNC:
-            print("\nSyncing booking to Microsoft Calendar...")
             try:
                 from services.calendar_service import GraphCalendarSync
-                graph = GraphCalendarSync()
-                graph.create_event(
+                GraphCalendarSync().create_event(
                     title=f"Room: {room_name} - {self.config.get('study_group_name', 'Study')}",
                     start_time=f"{self.config['booking_date']}T{self.config['start_time']}:00",
                     end_time=f"{self.config['booking_date']}T{self.config['start_time']}:00",
-                    location=room_name,
-                )
-                print("✓ Booking synced to calendar")
-            except Exception as e:
-                print(f"  Calendar sync failed: {e}")
+                    location=room_name)
+            except Exception:
+                pass
+
+    # ==================== MAIN WORKFLOW ====================
 
     def run(self):
-        """Execute the complete room booking workflow"""
+        """Execute the complete room booking workflow."""
         try:
-            print("\n" + "="*80)
             print("LBS ROOM BOOKING AUTOMATION")
-            print("="*80)
 
             # Feature flag: USE_NEW_SCHEDULING_ALGORITHM
             if USE_NEW_SCHEDULING_ALGORITHM:
-                print("\nUsing constraint-based scheduling (USE_NEW_SCHEDULING_ALGORITHM=true)")
-                print("The system will find the optimal room based on constraints")
-
+                print("Using constraint-based scheduling (USE_NEW_SCHEDULING_ALGORITHM=true)")
             # Feature flag: ENABLE_BULK_ROOM_BOOKING
             if ENABLE_BULK_ROOM_BOOKING:
-                print("Bulk room booking is available (ENABLE_BULK_ROOM_BOOKING=true)")
-
+                print("Bulk room booking available (ENABLE_BULK_ROOM_BOOKING=true)")
             # Feature flag: ENABLE_RECURRING_BOOKINGS
             if ENABLE_RECURRING_BOOKINGS:
-                print("Recurring bookings are available (ENABLE_RECURRING_BOOKINGS=true)")
+                print("Recurring bookings available (ENABLE_RECURRING_BOOKINGS=true)")
 
-            # Step 1: Login
             if not self.login():
-                print("\n✗ Login failed")
                 return False
-
-            # Step 2: Navigate to My Bookings
             if not self.navigate_to_bookings():
-                print("\n✗ Failed to navigate to bookings page")
                 return False
-
-            # Step 3: Click Book Room
             if not self.click_book_room():
-                print("\n✗ Failed to click Book Room button")
                 return False
-
-            # Step 4: Fill booking form
             if not self.fill_booking_form():
-                print("\n✗ Failed to fill booking form")
                 return False
-
-            # Step 5: Select and book room
             if not self.select_and_book_room():
-                print("\n✗ Failed to select and book room")
                 return False
 
-            print("\n" + "="*80)
-            print("✓ ROOM BOOKING PROCESS COMPLETED!")
-            print("="*80)
-
-            # Post-booking feature flag actions
+            print("ROOM BOOKING COMPLETED!")
             room_name = self.config.get('study_group_name', 'Study Room')
             self._send_booking_notifications(room_name)
             self._sync_booking_to_calendar(room_name)
-
             return True
 
         except Exception as e:
-            print(f"\n✗ Error during execution: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"Error: {e}")
             return False
-
         finally:
-            # Cleanup
             if self.driver:
                 self.driver.quit()
 
 
 def main():
-    print("="*80)
-    print("LBS ROOM BOOKING SCRIPT")
-    print("="*80)
-    print("\nThis script will:")
-    print("  1. Login to lbsmobile.london.edu (manual login required)")
-    print("  2. Navigate to the room booking page")
-    print("  3. Fill in booking details from room_booking_config.json")
-    print("  4. Select the first available room")
-    print("  5. Complete the booking")
-    print("\n" + "="*80 + "\n")
-
     booker = RoomBooker()
     booker.run()
 
