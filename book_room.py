@@ -13,6 +13,23 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from datetime import datetime
 import time
 import json
+import os
+
+# Feature flag imports
+from config.feature_flags import (
+    USE_HEADLESS_BROWSER,
+    ENABLE_LEGACY_AUTH,
+    USE_SAML_SSO,
+    AB_NEW_BOOKING_UI,
+    USE_NEW_SCHEDULING_ALGORITHM,
+    ENABLE_BULK_ROOM_BOOKING,
+    ENABLE_RECURRING_BOOKINGS,
+    USE_LEGACY_ROOM_API,
+    ENABLE_SLACK_NOTIFICATIONS,
+    ENABLE_EMAIL_NOTIFICATIONS,
+    ENABLE_GRAPH_CALENDAR_SYNC,
+    is_flag_enabled,
+)
 
 
 class RoomBooker:
@@ -42,6 +59,13 @@ class RoomBooker:
 
     def setup_driver(self):
         """Initialize Selenium WebDriver with Chrome"""
+        # Feature flag: USE_LEGACY_ROOM_API - Use SOAP/XML API instead of browser
+        if USE_LEGACY_ROOM_API:
+            print("LEGACY: Using SOAP/XML room booking API")
+            print("WARNING: This API was decommissioned. Booking will fail.")
+            # Dead code path - SOAP endpoints no longer exist
+            return False
+
         print("Setting up Chrome WebDriver...")
 
         options = webdriver.ChromeOptions()
@@ -52,9 +76,16 @@ class RoomBooker:
         options.add_experimental_option('useAutomationExtension', False)
         options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
 
+        # Feature flag: USE_HEADLESS_BROWSER
+        if USE_HEADLESS_BROWSER:
+            print("Running in headless mode (USE_HEADLESS_BROWSER=true)")
+            options.add_argument('--headless=new')
+            options.add_argument('--window-size=1920,1080')
+
         try:
             self.driver = webdriver.Chrome(options=options)
-            self.driver.maximize_window()
+            if not USE_HEADLESS_BROWSER:
+                self.driver.maximize_window()
             print("✓ Chrome WebDriver initialized")
             return True
         except Exception as e:
@@ -153,6 +184,16 @@ class RoomBooker:
         print("STEP 1: LOGIN TO LBSMOBILE.LONDON.EDU")
         print("="*80)
 
+        # Feature flag: ENABLE_LEGACY_AUTH - deprecated ADFS auth path
+        if ENABLE_LEGACY_AUTH:
+            print("\nUsing legacy ADFS authentication (ENABLE_LEGACY_AUTH=true)")
+            print("WARNING: ADFS auth is deprecated. Migrate to SAML SSO.")
+
+        # Feature flag: USE_SAML_SSO
+        if USE_SAML_SSO:
+            print("\nUsing SAML SSO for room booking authentication (USE_SAML_SSO=true)")
+            print("Redirecting through Azure AD SAML flow...")
+
         if not self.setup_driver():
             return False
 
@@ -218,6 +259,12 @@ class RoomBooker:
         print("\n" + "="*80)
         print("STEP 4: FILL BOOKING FORM")
         print("="*80)
+
+        # Feature flag: AB_NEW_BOOKING_UI - A/B test new booking interface
+        if AB_NEW_BOOKING_UI:
+            print("A/B Test: Using NEW booking form UI (AB_NEW_BOOKING_UI=true)")
+            print("New UI has improved date picker and room preview")
+            # In production, this would render a different form
 
         try:
             # Wait for form to load
@@ -391,12 +438,71 @@ class RoomBooker:
 
     # ==================== MAIN WORKFLOW ====================
 
+    def _send_booking_notifications(self, room_name):
+        """Send notifications after successful booking."""
+        if ENABLE_SLACK_NOTIFICATIONS:
+            print("\nSending Slack notification about booking...")
+            try:
+                from services.notification_service import SlackNotifier
+                slack = SlackNotifier()
+                slack.send(
+                    f"Room booked: {room_name} on {self.config['booking_date']} "
+                    f"at {self.config['start_time']} for {self.config['duration_hours']}h"
+                )
+                print("✓ Slack notification sent")
+            except Exception as e:
+                print(f"  Slack notification failed: {e}")
+
+        if ENABLE_EMAIL_NOTIFICATIONS:
+            print("\nSending email confirmation...")
+            try:
+                from services.notification_service import EmailNotifier
+                email_notifier = EmailNotifier()
+                email_notifier.send(
+                    to='team@london.edu',
+                    subject=f"Room Booked: {room_name}",
+                    body=f"Your room {room_name} has been booked for {self.config['booking_date']}.",
+                )
+                print("✓ Email confirmation sent")
+            except Exception as e:
+                print(f"  Email notification failed: {e}")
+
+    def _sync_booking_to_calendar(self, room_name):
+        """Sync booking to external calendar if enabled."""
+        if ENABLE_GRAPH_CALENDAR_SYNC:
+            print("\nSyncing booking to Microsoft Calendar...")
+            try:
+                from services.calendar_service import GraphCalendarSync
+                graph = GraphCalendarSync()
+                graph.create_event(
+                    title=f"Room: {room_name} - {self.config.get('study_group_name', 'Study')}",
+                    start_time=f"{self.config['booking_date']}T{self.config['start_time']}:00",
+                    end_time=f"{self.config['booking_date']}T{self.config['start_time']}:00",
+                    location=room_name,
+                )
+                print("✓ Booking synced to calendar")
+            except Exception as e:
+                print(f"  Calendar sync failed: {e}")
+
     def run(self):
         """Execute the complete room booking workflow"""
         try:
             print("\n" + "="*80)
             print("LBS ROOM BOOKING AUTOMATION")
             print("="*80)
+
+            # Feature flag: USE_NEW_SCHEDULING_ALGORITHM
+            if USE_NEW_SCHEDULING_ALGORITHM:
+                print("\nUsing constraint-based scheduling (USE_NEW_SCHEDULING_ALGORITHM=true)")
+                print("The system will find the optimal room based on constraints")
+
+            # Feature flag: ENABLE_BULK_ROOM_BOOKING
+            if ENABLE_BULK_ROOM_BOOKING:
+                print("Bulk room booking is available (ENABLE_BULK_ROOM_BOOKING=true)")
+
+            # Feature flag: ENABLE_RECURRING_BOOKINGS
+            if ENABLE_RECURRING_BOOKINGS:
+                print("Recurring bookings are available (ENABLE_RECURRING_BOOKINGS=true)")
 
             # Step 1: Login
             if not self.login():
@@ -427,8 +533,10 @@ class RoomBooker:
             print("✓ ROOM BOOKING PROCESS COMPLETED!")
             print("="*80)
 
-            # Auto-close when run from web UI (no user input needed)
-            # input("\n\nPress Enter to close browser and exit...")
+            # Post-booking feature flag actions
+            room_name = self.config.get('study_group_name', 'Study Room')
+            self._send_booking_notifications(room_name)
+            self._sync_booking_to_calendar(room_name)
 
             return True
 

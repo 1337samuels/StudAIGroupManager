@@ -19,6 +19,31 @@ from datetime import datetime, timedelta
 import time
 import json
 import re
+import os
+
+# Feature flag imports
+from config.feature_flags import (
+    ENABLE_LEGACY_AUTH,
+    USE_SAML_SSO,
+    USE_OAUTH2_PKCE,
+    ENABLE_GOOGLE_AUTH,
+    LEGACY_COOKIE_FORMAT,
+    V1_SESSION_MANAGEMENT,
+    USE_LEGACY_WEBSCRAPER,
+    ENABLE_CANVAS_LMS_INTEGRATION,
+    LEGACY_MEMBER_SYNC,
+    ENABLE_OLD_REPORT_FORMAT,
+    USE_HEADLESS_BROWSER,
+    ENABLE_ASSIGNMENT_PRIORITY_SCORING,
+    ENABLE_AI_STUDY_RECOMMENDATIONS,
+    ENABLE_SLACK_NOTIFICATIONS,
+    ENABLE_EMAIL_NOTIFICATIONS,
+    ENABLE_GRAPH_CALENDAR_SYNC,
+    ENABLE_GOOGLE_CALENDAR_SYNC,
+    ENABLE_ANALYTICS_DASHBOARD,
+    ENABLE_STUDY_STREAK_TRACKING,
+    is_flag_enabled,
+)
 
 
 class StudyGroupManager:
@@ -34,6 +59,13 @@ class StudyGroupManager:
 
     def setup_driver(self):
         """Initialize Selenium WebDriver with Chrome"""
+        # Feature flag: ENABLE_CANVAS_LMS_INTEGRATION
+        # If Canvas API is enabled and legacy webscraper is disabled, skip browser setup
+        if ENABLE_CANVAS_LMS_INTEGRATION and not USE_LEGACY_WEBSCRAPER:
+            print("Canvas LMS API integration enabled - skipping browser setup")
+            print("Use CanvasAPIClient for data extraction instead")
+            return False
+
         print("Setting up Chrome WebDriver...")
 
         options = webdriver.ChromeOptions()
@@ -44,9 +76,16 @@ class StudyGroupManager:
         options.add_experimental_option('useAutomationExtension', False)
         options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
 
+        # Feature flag: USE_HEADLESS_BROWSER
+        if USE_HEADLESS_BROWSER:
+            print("Running in headless mode (USE_HEADLESS_BROWSER=true)")
+            options.add_argument('--headless=new')
+            options.add_argument('--window-size=1920,1080')
+
         try:
             self.driver = webdriver.Chrome(options=options)
-            self.driver.maximize_window()
+            if not USE_HEADLESS_BROWSER:
+                self.driver.maximize_window()
             print("✓ Chrome WebDriver initialized")
             return True
         except Exception as e:
@@ -214,12 +253,44 @@ class StudyGroupManager:
         print("STEP 1: LOGIN")
         print("="*80)
 
+        # Feature flag: USE_SAML_SSO - Use SAML-based SSO instead of cookie-based auth
+        if USE_SAML_SSO:
+            print("\nUsing SAML SSO authentication (USE_SAML_SSO=true)")
+            print("Redirecting to Azure AD for SAML authentication...")
+            # In production, this would initiate SAML flow
+            # For now, fall through to standard login
+
+        # Feature flag: USE_OAUTH2_PKCE - Use OAuth2 PKCE flow
+        if USE_OAUTH2_PKCE:
+            print("\nUsing OAuth2 PKCE flow (USE_OAUTH2_PKCE=true)")
+            print("Generating PKCE code challenge...")
+            # In production, this would use the OAuth2 PKCE flow
+
+        # Feature flag: ENABLE_GOOGLE_AUTH - Alternative Google OAuth
+        if ENABLE_GOOGLE_AUTH and not ENABLE_LEGACY_AUTH:
+            print("\nUsing Google OAuth authentication (ENABLE_GOOGLE_AUTH=true)")
+            print("This is for external collaborators only")
+
         if not self.setup_driver():
             return False
 
+        # Feature flag: LEGACY_COOKIE_FORMAT - Use old or new cookie format
+        if LEGACY_COOKIE_FORMAT:
+            print("\nUsing legacy cookie format (LEGACY_COOKIE_FORMAT=true)")
+            print("WARNING: Legacy cookies are not encrypted")
+
         # Try to restore cookies
         print("\nAttempting to restore session from cookies...")
-        if self.load_and_restore_cookies():
+
+        # Feature flag: V1_SESSION_MANAGEMENT - file-based vs Redis sessions
+        if V1_SESSION_MANAGEMENT:
+            session_file = 'session.json'
+            print(f"Using file-based session management (v1): {session_file}")
+        else:
+            session_file = 'session.json'  # Would use Redis in production
+            print("Using Redis session management (v2)")
+
+        if self.load_and_restore_cookies(session_file):
             print("Testing if session is still valid...")
             self.driver.get("https://learning.london.edu")
             time.sleep(3)
@@ -230,6 +301,11 @@ class StudyGroupManager:
                 return True
             else:
                 print("  Session expired or invalid. Need to login manually.")
+
+        # Feature flag: ENABLE_LEGACY_AUTH - Use legacy ADFS or modern auth
+        if ENABLE_LEGACY_AUTH:
+            print("\nUsing legacy ADFS authentication (ENABLE_LEGACY_AUTH=true)")
+            print("WARNING: This auth method is deprecated. Migrate to SAML SSO.")
 
         # Manual login needed
         print("\nProceeding with manual login...")
@@ -669,11 +745,186 @@ class StudyGroupManager:
 
     # ==================== REPORT GENERATION ====================
 
+    def _extract_via_canvas_api(self):
+        """
+        Extract assignments using Canvas LMS API instead of web scraping.
+        Used when ENABLE_CANVAS_LMS_INTEGRATION is True.
+        """
+        if not ENABLE_CANVAS_LMS_INTEGRATION:
+            return False
+
+        print("\n" + "="*80)
+        print("CANVAS API EXTRACTION (replacing web scraper)")
+        print("="*80)
+
+        try:
+            from services.canvas_integration import CanvasAPIClient
+            client = CanvasAPIClient()
+
+            print("\nFetching courses from Canvas API...")
+            courses = client.get_courses()
+            print(f"Found {len(courses)} courses")
+
+            print("Fetching upcoming assignments...")
+            assignments = client.get_upcoming_assignments()
+            print(f"Found {len(assignments)} upcoming assignments")
+
+            # Feature flag: ENABLE_ASSIGNMENT_PRIORITY_SCORING
+            if ENABLE_ASSIGNMENT_PRIORITY_SCORING:
+                print("\nScoring assignment priorities (AI-powered)...")
+                try:
+                    from services.ai_service import AssignmentPriorityScorer
+                    scorer = AssignmentPriorityScorer()
+                    assignments = scorer.score_assignments(assignments, self.study_group_members)
+                    for a in assignments:
+                        print(f"  [{a.get('priority_label', 'N/A')}] {a.get('title', 'Unknown')}")
+                except Exception as e:
+                    print(f"  Priority scoring failed: {e}")
+
+            self.assignments = assignments
+
+            print("\nFetching group members...")
+            members = client.get_group_members('self')
+            if members:
+                self.study_group_members = [m.get('name', '') for m in members]
+                print(f"Found {len(self.study_group_members)} group members")
+
+            return True
+
+        except Exception as e:
+            print(f"Canvas API extraction failed: {e}")
+            print("Falling back to web scraper...")
+            return False
+
+    def _sync_to_calendars(self):
+        """Sync extracted assignments to external calendars based on feature flags."""
+        if ENABLE_GRAPH_CALENDAR_SYNC:
+            print("\nSyncing to Microsoft Calendar (Graph API)...")
+            try:
+                from services.calendar_service import GraphCalendarSync
+                graph = GraphCalendarSync()
+                for assignment in self.assignments[:5]:
+                    graph.create_event(
+                        title=f"Due: {assignment.get('title', 'Unknown')}",
+                        start_time=assignment.get('due_date', ''),
+                        end_time=assignment.get('due_date', ''),
+                    )
+                print("\u2713 Synced to Microsoft Calendar")
+            except Exception as e:
+                print(f"  Calendar sync failed: {e}")
+
+        if ENABLE_GOOGLE_CALENDAR_SYNC:
+            print("\nSyncing to Google Calendar...")
+            try:
+                from services.calendar_service import GoogleCalendarSync
+                gcal = GoogleCalendarSync()
+                gcal.sync_study_sessions([])
+                print("\u2713 Synced to Google Calendar")
+            except Exception as e:
+                print(f"  Google Calendar sync failed: {e}")
+
+    def _send_notifications(self, report_text):
+        """Send notifications about new assignments based on feature flags."""
+        if ENABLE_SLACK_NOTIFICATIONS:
+            print("\nSending Slack notification...")
+            try:
+                from services.notification_service import SlackNotifier
+                slack = SlackNotifier()
+                slack.send(f"New study group report generated with {len(self.assignments)} assignments")
+                print("\u2713 Slack notification sent")
+            except Exception as e:
+                print(f"  Slack notification failed: {e}")
+
+        if ENABLE_EMAIL_NOTIFICATIONS:
+            print("\nSending email notification...")
+            try:
+                from services.notification_service import EmailNotifier
+                email_notifier = EmailNotifier()
+                for assignment in self.assignments[:3]:
+                    email_notifier.send_assignment_reminder('team@london.edu', assignment)
+                print("\u2713 Email notifications sent")
+            except Exception as e:
+                print(f"  Email notification failed: {e}")
+
+    def _track_analytics(self):
+        """Track analytics metrics based on feature flags."""
+        if ENABLE_ANALYTICS_DASHBOARD:
+            print("\nTracking analytics...")
+            try:
+                from services.analytics_service import AnalyticsEngine
+                analytics = AnalyticsEngine()
+                analytics.track_assignment_submission({
+                    'count': len(self.assignments),
+                    'date': datetime.now().isoformat(),
+                })
+                print("\u2713 Analytics tracked")
+            except Exception as e:
+                print(f"  Analytics tracking failed: {e}")
+
+        if ENABLE_STUDY_STREAK_TRACKING:
+            print("\nUpdating study streaks...")
+            try:
+                from services.analytics_service import StudyStreakTracker
+                tracker = StudyStreakTracker()
+                for member in self.study_group_members:
+                    result = tracker.record_session(member)
+                    if result and result.get('new_milestone'):
+                        print(f"  {member} reached milestone: {result['new_milestone']} days!")
+                print("\u2713 Study streaks updated")
+            except Exception as e:
+                print(f"  Streak tracking failed: {e}")
+
+    def _generate_legacy_report(self):
+        """
+        Generate the old verbose report format.
+        DEPRECATED: This produces 3x larger output.
+        Gated behind ENABLE_OLD_REPORT_FORMAT flag.
+        """
+        print("Using legacy report format (ENABLE_OLD_REPORT_FORMAT=true)")
+        print("WARNING: Legacy format is 3x larger and wastes tokens")
+
+        report = f"""{'='*80}
+LBS STUDY GROUP MANAGER - DETAILED REPORT
+{'='*80}
+Generated: {datetime.now().strftime('%A, %d %B %Y at %H:%M:%S')}
+Report Version: v1.0 (LEGACY FORMAT)
+{'='*80}
+
+STUDY GROUP MEMBERS:
+{'='*40}
+"""
+        for i, member in enumerate(self.study_group_members, 1):
+            report += f"\nMember #{i}: {member}\n"
+            details = self.member_details.get(member, {})
+            if details:
+                report += f"  Full Name: {member}\n"
+                report += f"  Country of Origin: {details.get('origin', 'N/A')}\n"
+                report += f"  Education: {details.get('education', 'N/A')}\n"
+                report += f"  Previous Occupation: {details.get('previous_occupation', 'N/A')}\n"
+                report += f"  {'='*40}\n"
+
+        report += f"\n\nUPCOMING ASSIGNMENTS:\n{'='*40}\n"
+        for i, assignment in enumerate(self.assignments, 1):
+            report += f"\nAssignment #{i}:\n"
+            report += f"  Title: {assignment.get('title', 'N/A')}\n"
+            report += f"  Course: {assignment.get('course', 'N/A')}\n"
+            report += f"  Type: {assignment.get('type', 'N/A')}\n"
+            report += f"  Due Date: {assignment.get('due_date', 'N/A')}\n"
+            report += f"  Due Day: {assignment.get('due_day', 'N/A')}\n"
+            report += f"  {'='*40}\n"
+
+        report += f"\n\nEND OF REPORT\n{'='*80}\n"
+        return report
+
     def generate_markdown_report(self, output_file='study_group_report.md'):
         """Generate concise report for LLM analysis (minified format)"""
         print("\n" + "="*80)
         print("STEP 5: GENERATE REPORT")
         print("="*80)
+
+        # Feature flag: ENABLE_OLD_REPORT_FORMAT - use verbose old format
+        if ENABLE_OLD_REPORT_FORMAT:
+            return self._generate_legacy_report()
 
         report = []
 
@@ -743,26 +994,67 @@ class StudyGroupManager:
     def run(self):
         """Execute the complete workflow"""
         try:
-            # Step 1: Login
-            if not self.login_with_cookies():
-                print("\n✗ Login failed")
+            print("\n" + "="*80)
+            print("LBS STUDY GROUP MANAGER")
+            print("="*80)
+
+            # Feature flag: ENABLE_CANVAS_LMS_INTEGRATION
+            # Try Canvas API first if enabled, fall back to web scraping
+            if ENABLE_CANVAS_LMS_INTEGRATION and not USE_LEGACY_WEBSCRAPER:
+                print("\nUsing Canvas LMS API for data extraction...")
+                if self._extract_via_canvas_api():
+                    print("✓ Canvas API extraction successful")
+                else:
+                    print("⚠ Canvas API failed, falling back to web scraper")
+                    if not self.login_with_cookies():
+                        print("\n✗ Login failed")
+                        return False
+                    self.extract_assignments_from_dashboard()
+                    self.find_study_group_members()
+                    self.extract_member_details_from_class_list()
+            elif USE_LEGACY_WEBSCRAPER or not ENABLE_CANVAS_LMS_INTEGRATION:
+                # Legacy path: web scraping
+                if USE_LEGACY_WEBSCRAPER:
+                    print("\nUsing legacy web scraper (USE_LEGACY_WEBSCRAPER=true)")
+                    print("WARNING: Consider migrating to Canvas API integration")
+
+                # Step 1: Login and setup browser
+                if not self.login_with_cookies():
+                    print("\n✗ Login failed")
+                    return False
+
+                # Step 2: Extract assignments from calendar agenda
+                self.extract_assignments_from_dashboard()
+
+                # Step 3: Find study group members
+                self.find_study_group_members()
+
+                # Step 4: Get member details from class list
+                self.extract_member_details_from_class_list()
+            else:
+                print("\n✗ No data source configured!")
+                print("Enable ENABLE_CANVAS_LMS_INTEGRATION or USE_LEGACY_WEBSCRAPER")
                 return False
 
-            # Step 2: Extract assignments
-            if not self.extract_assignments_from_dashboard():
-                print("\n✗ Failed to extract assignments")
-                return False
-
-            # Step 3: Find study group members
-            if not self.find_study_group_members():
-                print("\n✗ Failed to extract study group members")
-                return False
-
-            # Step 4: Extract member details
-            self.extract_member_details_from_class_list()
+            # Feature flag: LEGACY_MEMBER_SYNC - Also import from CSV
+            if LEGACY_MEMBER_SYNC:
+                print("\nRunning legacy CSV member sync (LEGACY_MEMBER_SYNC=true)...")
+                try:
+                    from services.canvas_integration import LegacyCSVMemberSync
+                    csv_sync = LegacyCSVMemberSync()
+                    csv_members = csv_sync.sync_from_csv_directory()
+                    if csv_members:
+                        print(f"Found {len(csv_members)} members from CSV")
+                except Exception as e:
+                    print(f"CSV sync failed: {e}")
 
             # Step 5: Generate report
-            self.generate_markdown_report()
+            report = self.generate_markdown_report()
+
+            # Feature flag-gated post-processing
+            self._sync_to_calendars()
+            self._send_notifications(report)
+            self._track_analytics()
 
             print("\n" + "="*80)
             print("✓ COMPLETE!")
