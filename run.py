@@ -1,13 +1,6 @@
 #!/usr/bin/env python3
-"""
-LBS Study Group Manager - All-in-One Script
-Run this single script to:
-1. Login to learning.london.edu (restores cookies if available)
-2. Extract upcoming assignments from Dashboard
-3. Find Study Group members
-4. Extract member background details from Class List
-5. Generate markdown report for LLM analysis
-"""
+"""LBS Study Group Manager - All-in-One Script
+Extracts assignments, members, and generates reports via web scraping or Canvas API."""
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -23,26 +16,14 @@ import os
 
 # Feature flag imports
 from config.feature_flags import (
-    ENABLE_LEGACY_AUTH,
-    USE_SAML_SSO,
-    USE_OAUTH2_PKCE,
-    ENABLE_GOOGLE_AUTH,
-    LEGACY_COOKIE_FORMAT,
-    V1_SESSION_MANAGEMENT,
-    USE_LEGACY_WEBSCRAPER,
-    ENABLE_CANVAS_LMS_INTEGRATION,
-    LEGACY_MEMBER_SYNC,
-    ENABLE_OLD_REPORT_FORMAT,
-    USE_HEADLESS_BROWSER,
-    ENABLE_ASSIGNMENT_PRIORITY_SCORING,
-    ENABLE_AI_STUDY_RECOMMENDATIONS,
-    ENABLE_SLACK_NOTIFICATIONS,
-    ENABLE_EMAIL_NOTIFICATIONS,
-    ENABLE_GRAPH_CALENDAR_SYNC,
-    ENABLE_GOOGLE_CALENDAR_SYNC,
-    ENABLE_ANALYTICS_DASHBOARD,
-    ENABLE_STUDY_STREAK_TRACKING,
-    is_flag_enabled,
+    ENABLE_LEGACY_AUTH, USE_SAML_SSO, USE_OAUTH2_PKCE, ENABLE_GOOGLE_AUTH,
+    LEGACY_COOKIE_FORMAT, V1_SESSION_MANAGEMENT, USE_LEGACY_WEBSCRAPER,
+    ENABLE_CANVAS_LMS_INTEGRATION, LEGACY_MEMBER_SYNC, ENABLE_OLD_REPORT_FORMAT,
+    USE_HEADLESS_BROWSER, ENABLE_ASSIGNMENT_PRIORITY_SCORING,
+    ENABLE_AI_STUDY_RECOMMENDATIONS, ENABLE_SLACK_NOTIFICATIONS,
+    ENABLE_EMAIL_NOTIFICATIONS, ENABLE_GRAPH_CALENDAR_SYNC,
+    ENABLE_GOOGLE_CALENDAR_SYNC, ENABLE_ANALYTICS_DASHBOARD,
+    ENABLE_STUDY_STREAK_TRACKING, is_flag_enabled,
 )
 
 
@@ -51,34 +32,26 @@ class StudyGroupManager:
         self.driver = None
         self.cookies = {}
         self.assignments = []
-        self.events = []  # Separate list for calendar events
+        self.events = []
         self.study_group_members = []
         self.member_details = {}
 
     # ==================== SELENIUM SETUP ====================
 
     def setup_driver(self):
-        """Initialize Selenium WebDriver with Chrome"""
-        # Feature flag: ENABLE_CANVAS_LMS_INTEGRATION
-        # If Canvas API is enabled and legacy webscraper is disabled, skip browser setup
+        """Initialize Selenium WebDriver with Chrome."""
         if ENABLE_CANVAS_LMS_INTEGRATION and not USE_LEGACY_WEBSCRAPER:
-            print("Canvas LMS API integration enabled - skipping browser setup")
-            print("Use CanvasAPIClient for data extraction instead")
+            print("Canvas LMS API enabled - skipping browser setup")
             return False
-
-        print("Setting up Chrome WebDriver...")
 
         options = webdriver.ChromeOptions()
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-blink-features=AutomationControlled')
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
-        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
 
         # Feature flag: USE_HEADLESS_BROWSER
         if USE_HEADLESS_BROWSER:
-            print("Running in headless mode (USE_HEADLESS_BROWSER=true)")
             options.add_argument('--headless=new')
             options.add_argument('--window-size=1920,1080')
 
@@ -86,1011 +59,460 @@ class StudyGroupManager:
             self.driver = webdriver.Chrome(options=options)
             if not USE_HEADLESS_BROWSER:
                 self.driver.maximize_window()
-            print("✓ Chrome WebDriver initialized")
             return True
         except Exception as e:
-            print(f"✗ Failed to initialize Chrome WebDriver: {e}")
+            print(f"Failed to init WebDriver: {e}")
             return False
 
     # ==================== COOKIE MANAGEMENT ====================
 
     def load_and_restore_cookies(self, filename='session.json'):
-        """Load cookies from file and restore them to the browser"""
+        """Load cookies from file and restore them."""
         try:
             with open(filename, 'r') as f:
                 self.cookies = json.load(f)
-
             if not self.driver:
                 return False
-
-            # Navigate to the domain first (cookies need a domain context)
             self.driver.get("https://learning.london.edu")
             time.sleep(1)
-
-            # Add each cookie to the browser
             for name, cookie_data in self.cookies.items():
-                cookie = {
-                    'name': name,
-                    'value': cookie_data['value'],
-                    'domain': cookie_data.get('domain', '.learning.london.edu'),
-                    'path': cookie_data.get('path', '/'),
-                }
-                if 'secure' in cookie_data:
-                    cookie['secure'] = cookie_data['secure']
-
+                cookie = {'name': name, 'value': cookie_data['value'],
+                          'domain': cookie_data.get('domain', '.learning.london.edu'),
+                          'path': cookie_data.get('path', '/')}
                 try:
                     self.driver.add_cookie(cookie)
-                except Exception as e:
-                    pass  # Some cookies might fail, that's okay
-
-            print(f"✓ Loaded and restored cookies from {filename}")
+                except Exception:
+                    pass
             return True
-
-        except FileNotFoundError:
-            print(f"  No session file found at {filename}")
-            return False
-        except Exception as e:
-            print(f"  Error loading session: {e}")
+        except (FileNotFoundError, Exception):
             return False
 
     def extract_cookies(self):
-        """Extract cookies from the browser session"""
+        """Extract cookies from the browser session."""
         try:
-            print("Extracting session cookies...")
             cookies = self.driver.get_cookies()
-
-            self.cookies = {}
-            for cookie in cookies:
-                self.cookies[cookie['name']] = {
-                    'value': cookie['value'],
-                    'domain': cookie.get('domain', ''),
-                    'path': cookie.get('path', '/'),
-                    'secure': cookie.get('secure', False)
-                }
-
-            print(f"✓ Extracted {len(self.cookies)} cookies")
+            self.cookies = {c['name']: {'value': c['value'], 'domain': c.get('domain', ''),
+                            'path': c.get('path', '/'), 'secure': c.get('secure', False)} for c in cookies}
             return self.cookies
-        except Exception as e:
-            print(f"✗ Error extracting cookies: {e}")
+        except Exception:
             return {}
 
     def save_session(self, filename='session.json'):
-        """Save session cookies to a file"""
+        """Save session cookies to file."""
         try:
             with open(filename, 'w') as f:
                 json.dump(self.cookies, f, indent=2)
-            print(f"✓ Session saved to {filename}")
             return True
-        except Exception as e:
-            print(f"✗ Error saving session: {e}")
+        except Exception:
             return False
-
-    # ==================== RETRY LOGIC ====================
-
-    def smart_wait_and_retry(self, action_func, max_retries=3, initial_wait=0.5, retry_wait=5):
-        """Try action fast first, then retry with longer waits if it fails"""
-        for attempt in range(max_retries):
-            try:
-                if attempt == 0:
-                    # First try - fast
-                    if initial_wait > 0:
-                        time.sleep(initial_wait)
-                else:
-                    # Retries - wait longer
-                    print(f"  Retry {attempt}/{max_retries-1} after {retry_wait}s wait...")
-                    time.sleep(retry_wait)
-
-                return action_func()
-
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    raise
-                print(f"  Attempt {attempt+1} failed: {e}")
-
-        return None
 
     # ==================== LOGIN ====================
 
     def wait_for_manual_login(self, initial_url, timeout=300):
-        """Navigate to URL and wait for user to manually complete login"""
+        """Navigate to URL and wait for user to complete login."""
         try:
-            print(f"\n{'='*60}")
-            print("MANUAL LOGIN REQUIRED")
-            print('='*60)
-            print(f"\n📱 Opening browser to: {initial_url}")
-            print("\nPlease complete the following steps:")
-            print("  1. Enter your Microsoft credentials")
-            print("  2. Complete MFA (Microsoft Authenticator)")
-            print("  3. Wait for the page to fully load after login")
-            print(f"\nTimeout: {timeout} seconds")
-            print('='*60)
-
             self.driver.get(initial_url)
-
             start_time = time.time()
-            check_interval = 2
-
-            print("\n⏳ Waiting for you to complete login...")
-
             while (time.time() - start_time) < timeout:
-                try:
-                    current_url = self.driver.current_url.lower()
-
-                    if ('learning.london.edu' in current_url or 'london.instructure.com' in current_url):
-                        if not any(word in current_url for word in ['login', 'auth', 'microsoft', 'saml']):
-                            print("\n✓ Login successful!")
-                            print(f"  Current URL: {self.driver.current_url}")
-                            return True
-
-                    elapsed = int(time.time() - start_time)
-                    if elapsed % 10 == 0 and elapsed > 0:
-                        print(f"  Still waiting... ({elapsed}s elapsed)")
-
-                    time.sleep(check_interval)
-
-                except Exception as e:
-                    print(f"  Warning during wait: {e}")
-                    time.sleep(check_interval)
-
-            print(f"\n⚠ Timeout after {timeout} seconds")
-
-            current_url = self.driver.current_url
-            print(f"  Current URL: {current_url}")
-
-            if 'learning.london.edu' in current_url or 'london.instructure.com' in current_url:
-                print("\n  You appear to be on the target site. Continuing...")
-                return True
-
-            return False
-
-        except Exception as e:
-            print(f"\n✗ Error during manual login wait: {e}")
+                current_url = self.driver.current_url.lower()
+                if ('learning.london.edu' in current_url or 'london.instructure.com' in current_url):
+                    if not any(w in current_url for w in ['login', 'auth', 'microsoft', 'saml']):
+                        return True
+                time.sleep(2)
+            return 'learning.london.edu' in self.driver.current_url
+        except Exception:
             return False
 
     def login_with_cookies(self):
-        """Login using existing cookies or manual login"""
-        print("="*80)
-        print("STEP 1: LOGIN")
-        print("="*80)
-
-        # Feature flag: USE_SAML_SSO - Use SAML-based SSO instead of cookie-based auth
+        """Login using existing cookies or manual login."""
+        # Feature flag: USE_SAML_SSO
         if USE_SAML_SSO:
-            print("\nUsing SAML SSO authentication (USE_SAML_SSO=true)")
-            print("Redirecting to Azure AD for SAML authentication...")
-            # In production, this would initiate SAML flow
-            # For now, fall through to standard login
+            print("Using SAML SSO authentication (USE_SAML_SSO=true)")
 
-        # Feature flag: USE_OAUTH2_PKCE - Use OAuth2 PKCE flow
+        # Feature flag: USE_OAUTH2_PKCE
         if USE_OAUTH2_PKCE:
-            print("\nUsing OAuth2 PKCE flow (USE_OAUTH2_PKCE=true)")
-            print("Generating PKCE code challenge...")
-            # In production, this would use the OAuth2 PKCE flow
+            print("Using OAuth2 PKCE flow (USE_OAUTH2_PKCE=true)")
 
-        # Feature flag: ENABLE_GOOGLE_AUTH - Alternative Google OAuth
+        # Feature flag: ENABLE_GOOGLE_AUTH
         if ENABLE_GOOGLE_AUTH and not ENABLE_LEGACY_AUTH:
-            print("\nUsing Google OAuth authentication (ENABLE_GOOGLE_AUTH=true)")
-            print("This is for external collaborators only")
+            print("Using Google OAuth authentication (ENABLE_GOOGLE_AUTH=true)")
 
         if not self.setup_driver():
             return False
 
-        # Feature flag: LEGACY_COOKIE_FORMAT - Use old or new cookie format
+        # Feature flag: LEGACY_COOKIE_FORMAT
         if LEGACY_COOKIE_FORMAT:
-            print("\nUsing legacy cookie format (LEGACY_COOKIE_FORMAT=true)")
-            print("WARNING: Legacy cookies are not encrypted")
+            print("Using legacy cookie format (WARNING: not encrypted)")
 
-        # Try to restore cookies
-        print("\nAttempting to restore session from cookies...")
-
-        # Feature flag: V1_SESSION_MANAGEMENT - file-based vs Redis sessions
+        # Feature flag: V1_SESSION_MANAGEMENT
+        session_file = 'session.json'
         if V1_SESSION_MANAGEMENT:
-            session_file = 'session.json'
-            print(f"Using file-based session management (v1): {session_file}")
+            print("Using file-based session management (v1)")
         else:
-            session_file = 'session.json'  # Would use Redis in production
             print("Using Redis session management (v2)")
 
         if self.load_and_restore_cookies(session_file):
-            print("Testing if session is still valid...")
             self.driver.get("https://learning.london.edu")
             time.sleep(3)
-
             current_url = self.driver.current_url.lower()
-            if 'learning.london.edu' in current_url and not any(word in current_url for word in ['login', 'auth', 'microsoft', 'saml']):
-                print("✓ Session restored successfully! Already logged in.")
+            if 'learning.london.edu' in current_url and not any(w in current_url for w in ['login', 'auth']):
                 return True
-            else:
-                print("  Session expired or invalid. Need to login manually.")
 
-        # Feature flag: ENABLE_LEGACY_AUTH - Use legacy ADFS or modern auth
+        # Feature flag: ENABLE_LEGACY_AUTH
         if ENABLE_LEGACY_AUTH:
-            print("\nUsing legacy ADFS authentication (ENABLE_LEGACY_AUTH=true)")
-            print("WARNING: This auth method is deprecated. Migrate to SAML SSO.")
+            print("Using legacy ADFS authentication (DEPRECATED)")
 
-        # Manual login needed
-        print("\nProceeding with manual login...")
         if not self.wait_for_manual_login("https://learning.london.edu"):
             return False
-
-        # Save new session
         self.extract_cookies()
         self.save_session()
-
         return True
 
     # ==================== ASSIGNMENTS EXTRACTION ====================
 
     def extract_assignments_from_dashboard(self):
-        """Navigate to Calendar Agenda and extract upcoming assignments and events"""
-        print("\n" + "="*80)
-        print("STEP 2: EXTRACT UPCOMING ASSIGNMENTS AND EVENTS")
-        print("="*80)
-
-        def navigate_to_calendar_agenda():
-            print("\nNavigating to Calendar Agenda view...")
-            self.driver.get("https://learning.london.edu/calendar#view_name=agenda")
-            time.sleep(3)
-            return True
-
-        self.smart_wait_and_retry(navigate_to_calendar_agenda)
-
-        # Wait for agenda items to load
-        print("Waiting for calendar agenda to load...")
+        """Navigate to Calendar Agenda and extract upcoming assignments."""
+        self.driver.get("https://learning.london.edu/calendar#view_name=agenda")
         time.sleep(4)
-
-        # Get page source and parse
         html = self.driver.page_source
         soup = BeautifulSoup(html, 'html.parser')
-
-        # Find all agenda days and items
         agenda_items = soup.find_all('li', class_='agenda-event__item')
-        print(f"Found {len(agenda_items)} agenda items")
-
-        # Parse assignments and events
         today = datetime.now()
         two_weeks = today + timedelta(days=14)
-
-        # Use sets to track unique items and avoid duplicates
-        seen_assignments = set()
-        seen_events = set()
-
-        # Track current date context
+        seen_assignments, seen_events = set(), set()
         current_date = None
 
         for item in agenda_items:
             try:
-                # Check if there's a preceding agenda-date element (find parent structure)
                 parent = item.find_parent('div', class_='agenda-event__container')
                 if parent:
                     date_div = parent.find_previous_sibling('div', class_='agenda-day')
                     if date_div:
                         date_elem = date_div.find('h3', class_='agenda-date')
                         if date_elem:
-                            # Extract date from aria-hidden span (e.g., "Tue, 25 Nov")
                             date_text = date_elem.find('span', {'aria-hidden': 'true'})
                             if date_text:
                                 current_date = date_text.get_text(strip=True)
 
-                # Determine type by icon class
                 icon = item.find('i')
                 is_assignment = icon and 'icon-assignment' in icon.get('class', [])
                 is_quiz = icon and 'icon-quiz' in icon.get('class', [])
                 is_event = icon and 'icon-calendar-month' in icon.get('class', [])
-
-                # Extract title from agenda-event__title span
                 title_elem = item.find('span', class_='agenda-event__title')
                 title = title_elem.get_text(strip=True) if title_elem else 'Untitled'
-
-                # Extract time from agenda-event__time div
                 time_elem = item.find('div', class_='agenda-event__time')
                 time_str = time_elem.get_text(strip=True) if time_elem else None
 
-                # Extract course from screenreader text containing "Calendar"
                 course = 'Unknown Course'
-                screenreader_spans = item.find_all('span', class_='screenreader-only')
-                for span in screenreader_spans:
+                for span in item.find_all('span', class_='screenreader-only'):
                     text = span.get_text(strip=True)
                     if text.startswith('Calendar '):
-                        # Format: "Calendar C111   AUT25 Finance I"
                         course = text.replace('Calendar ', '').strip()
                         break
 
-                # Parse datetime
                 if not current_date or not time_str:
                     continue
 
-                # Clean time string (e.g., "Due 16:00" -> "16:00" or "16:00" -> "16:00")
                 time_clean = time_str.replace('Due ', '').replace('Starts at ', '').strip()
-
-                # Parse date (e.g., "Tue, 25 Nov" with current year)
                 try:
-                    # Add current year to the date string
-                    current_year = datetime.now().year
-                    date_with_year = f"{current_date} {current_year}"
-                    # Parse format: "Tue, 25 Nov 2025"
+                    date_with_year = f"{current_date} {datetime.now().year}"
                     date_obj = datetime.strptime(date_with_year, "%a, %d %b %Y")
-                    # Combine with time
                     time_obj = datetime.strptime(time_clean, "%H:%M").time()
                     event_datetime = datetime.combine(date_obj.date(), time_obj)
-                except Exception as e:
-                    print(f"  Warning: Could not parse date/time: {current_date} {time_clean} - {e}")
+                except Exception:
                     continue
 
-                # Skip if outside our range
                 if not (today <= event_datetime <= two_weeks):
                     continue
 
-                # Create unique identifier to detect duplicates
                 unique_id = f"{title}|{event_datetime.strftime('%Y-%m-%d %H:%M')}|{course}"
 
-                # Categorize and add to appropriate list (avoiding duplicates)
                 if (is_assignment or is_quiz) and unique_id not in seen_assignments:
                     seen_assignments.add(unique_id)
                     self.assignments.append({
-                        'title': title,
-                        'course': course,
+                        'title': title, 'course': course,
                         'type': 'Quiz' if is_quiz else 'Assignment',
                         'due_date': event_datetime.strftime("%d %B %Y %H:%M"),
                         'due_day': event_datetime.strftime("%A"),
                         'due_datetime': event_datetime,
-                        'location': '',  # Location not in agenda view
-                        'url': ''  # URL extraction would need data-event-id lookup
                     })
                 elif is_event and unique_id not in seen_events:
                     seen_events.add(unique_id)
                     self.events.append({
-                        'title': title,
-                        'course': course,
-                        'type': 'Event',
+                        'title': title, 'course': course, 'type': 'Event',
                         'event_date': event_datetime.strftime("%d %B %Y %H:%M"),
                         'event_day': event_datetime.strftime("%A"),
-                        'due_datetime': event_datetime,  # For sorting
-                        'location': '',  # Location not in agenda view
-                        'url': ''  # URL extraction would need data-event-id lookup
+                        'due_datetime': event_datetime,
                     })
-
-            except Exception as e:
-                print(f"  Warning: Error parsing agenda item: {e}")
+            except Exception:
                 continue
 
-        print(f"✓ Found {len(self.assignments)} unique assignments")
-        print(f"✓ Found {len(self.events)} unique events")
-
-        # Sort both lists by date
         self.assignments.sort(key=lambda x: x.get('due_datetime', datetime.max))
         self.events.sort(key=lambda x: x.get('due_datetime', datetime.max))
-
         return True
 
     # ==================== STUDY GROUP MEMBERS ====================
 
     def find_study_group_members(self):
-        """Navigate to a study group and extract member names"""
-        print("\n" + "="*80)
-        print("STEP 3: EXTRACT STUDY GROUP MEMBERS")
-        print("="*80)
-
-        def navigate_to_groups():
-            print("\nNavigating to Groups page...")
-            self.driver.get("https://learning.london.edu/groups")
+        """Navigate to a study group and extract member names."""
+        self.driver.get("https://learning.london.edu/groups")
+        time.sleep(3)
+        try:
+            links = self.driver.find_elements(By.PARTIAL_LINK_TEXT, 'Study Group')
+            if links:
+                links[0].click()
+                time.sleep(3)
+        except Exception:
+            return False
+        try:
+            self.driver.find_element(By.PARTIAL_LINK_TEXT, 'People').click()
             time.sleep(3)
-            return True
-
-        self.smart_wait_and_retry(navigate_to_groups)
-
-        # Find a study group link
-        print("Looking for Study Group...")
-
-        def find_study_group():
-            study_group_links = self.driver.find_elements(By.PARTIAL_LINK_TEXT, 'Study Group')
-
-            if study_group_links:
-                study_group_name = study_group_links[0].text
-                print(f"  Found: {study_group_name}")
-                study_group_links[0].click()
-                time.sleep(3)
-                return True
-            return False
-
-        if not self.smart_wait_and_retry(find_study_group, retry_wait=5):
-            print("✗ Could not find Study Group")
-            return False
-
-        # Click on People tab
-        def click_people_tab():
-            print("Navigating to People tab...")
-            try:
-                people_link = self.driver.find_element(By.PARTIAL_LINK_TEXT, 'People')
-                people_link.click()
-                time.sleep(3)
-                return True
-            except:
-                try:
-                    people_link = self.driver.find_element(By.PARTIAL_LINK_TEXT, 'Members')
-                    people_link.click()
-                    time.sleep(3)
-                    return True
-                except:
-                    return False
-
-        self.smart_wait_and_retry(click_people_tab, retry_wait=5)
-
-        # Extract member names
-        print("Extracting member names...")
-        html = self.driver.page_source
-        soup = BeautifulSoup(html, 'html.parser')
-
+        except Exception:
+            pass
+        soup = BeautifulSoup(self.driver.page_source, 'html.parser')
         roster_div = soup.find('div', class_='student_roster')
         if roster_div:
-            user_links = roster_div.find_all('a', class_='user_name')
-            for link in user_links:
+            for link in roster_div.find_all('a', class_='user_name'):
                 name = link.get_text(strip=True)
                 if name:
                     self.study_group_members.append(name)
-
-            print(f"✓ Found {len(self.study_group_members)} study group members:")
-            for i, member in enumerate(self.study_group_members, 1):
-                print(f"  {i}. {member}")
-        else:
-            print("  Warning: Could not find roster section")
-
         return True
 
     # ==================== CLASS LIST DATA ====================
 
     def extract_member_details_from_class_list(self):
-        """Extract member details from Class List (dynamic iframe content)"""
-        print("\n" + "="*80)
-        print("STEP 4: EXTRACT MEMBER DETAILS FROM CLASS LIST")
-        print("="*80)
-
-        # Navigate to a course
-        def navigate_to_course():
-            print("\nNavigating to Accounting course...")
-            self.driver.get("https://learning.london.edu/courses/11291")
-            time.sleep(3)
-            return True
-
-        self.smart_wait_and_retry(navigate_to_course)
-
-        # Click on Class List
-        def click_class_list():
-            print("Clicking on Class List...")
-            try:
-                class_list_link = self.driver.find_element(By.PARTIAL_LINK_TEXT, 'Class List')
-                class_list_link.click()
-                time.sleep(5)  # Wait for external tool to load
-                return True
-            except Exception as e:
-                print(f"  Could not find Class List link: {e}")
-                return False
-
-        if not self.smart_wait_and_retry(click_class_list, retry_wait=5):
-            print("⚠ Could not access Class List - using placeholder data")
+        """Extract member details from Class List iframe."""
+        self.driver.get("https://learning.london.edu/courses/11291")
+        time.sleep(3)
+        try:
+            self.driver.find_element(By.PARTIAL_LINK_TEXT, 'Class List').click()
+            time.sleep(5)
+        except Exception:
             self._create_placeholder_member_details()
             return True
-
-        # Wait for iframe to load and switch to it
-        print("Waiting for Class List iframe to load...")
-        time.sleep(3)  # Reduced from 8 to 3 seconds
-
-        # Try to switch to iframe
         try:
-            iframes = self.driver.find_elements(By.TAG_NAME, 'iframe')
-            print(f"  Found {len(iframes)} iframes")
-
-            for iframe in iframes:
+            for iframe in self.driver.find_elements(By.TAG_NAME, 'iframe'):
                 try:
                     self.driver.switch_to.frame(iframe)
-                    time.sleep(1)  # Reduced from 2 to 1 second
-
-                    # Try to click the "Students" tab/button to load student data
-                    print("  Looking for Students tab...")
-                    try:
-                        students_button = None
-
-                        # Try CSS selector first (most specific)
-                        try:
-                            students_button = self.driver.find_element(By.CSS_SELECTOR, '#cl-profileLayoutTabs > li:nth-child(2) > a')
-                            print("  Found Students button via CSS selector")
-                        except:
-                            pass
-
-                        # Try by href attribute
-                        if not students_button:
-                            try:
-                                students_button = self.driver.find_element(By.CSS_SELECTOR, 'a[href="/ClassList/DPO/Student/List"]')
-                                print("  Found Students button via href")
-                            except:
-                                pass
-
-                        # Try exact XPath
-                        if not students_button:
-                            try:
-                                students_button = self.driver.find_element(By.XPATH, '/html/body/div[2]/div/div[2]/ul/li[2]/a')
-                                print("  Found Students button via XPath")
-                            except:
-                                pass
-
-                        # Fallback: Try finding by partial link text
-                        if not students_button:
-                            try:
-                                students_button = self.driver.find_element(By.PARTIAL_LINK_TEXT, 'Students')
-                                print("  Found Students button via partial link text")
-                            except:
-                                pass
-
-                        if students_button:
-                            print("  ✓ Clicking Students button...")
-                            students_button.click()
-                            time.sleep(2)  # Reduced from 5 to 2 seconds
-                            print("  ✓ Students data should now be loaded")
-                        else:
-                            print("  ⚠ Students button not found, trying to proceed anyway...")
-
-                    except Exception as e:
-                        print(f"  Warning: Could not click Students button: {e}")
-
-                    # Get page source after clicking Students tab
+                    time.sleep(1)
                     page_source = self.driver.page_source
-
-                    # Check if we have student data
                     if any(name in page_source for name in self.study_group_members[:2]):
-                        print("  ✓ Found student data in iframe!")
                         self._parse_class_list_iframe(page_source)
                         self.driver.switch_to.default_content()
                         return True
-
-                    # Switch back and try next iframe
                     self.driver.switch_to.default_content()
-                except:
+                except Exception:
                     self.driver.switch_to.default_content()
-                    continue
-
-            print("  Could not find student data in iframes - using placeholder")
-            self._create_placeholder_member_details()
-
-        except Exception as e:
-            print(f"  Error accessing iframe: {e}")
-            self._create_placeholder_member_details()
-
+        except Exception:
+            pass
+        self._create_placeholder_member_details()
         return True
 
     def _parse_class_list_iframe(self, html):
-        """Parse the Class List iframe HTML to extract member details"""
+        """Parse the Class List iframe HTML."""
         soup = BeautifulSoup(html, 'html.parser')
-
-        print("  Parsing Class List data...")
-
-        # Find all student profile cards
-        # Each student is in an <li> with class 'profile-box list-group-item cl-profileItem'
-        profile_cards = soup.find_all('li', class_='profile-box')
-
-        print(f"  Found {len(profile_cards)} student profiles")
-
-        # Create a mapping of student data
         student_data = {}
-
-        for card in profile_cards:
+        for card in soup.find_all('li', class_='profile-box'):
             try:
-                # Extract student name from displayName field
-                name_elem = card.find('h5', {'name': 'displayName'})
-                if not name_elem:
-                    name_elem = card.find('div', {'name': 'displayName'})
-
+                name_elem = card.find('h5', {'name': 'displayName'}) or card.find('div', {'name': 'displayName'})
                 if not name_elem:
                     continue
-
-                student_name = name_elem.get_text(strip=True)
-
-                # Extract nationality/origin
-                origin_elem = card.find('div', {'name': 'nationality-country'})
-                origin = origin_elem.get_text(strip=True) if origin_elem else 'Not specified'
-
-                # Extract job title and employer
-                job_elem = card.find('div', {'name': 'jobTitle-employerName'})
-                occupation = job_elem.get_text(strip=True) if job_elem and job_elem.get_text(strip=True) else 'Not specified'
-
-                # Extract education
-                edu_elem = card.find('div', {'name': 'education'})
-                education = edu_elem.get_text(strip=True) if edu_elem and edu_elem.get_text(strip=True) else 'Not specified'
-
-                # Store in mapping
-                student_data[student_name] = {
-                    'origin': origin,
-                    'education': education,
-                    'previous_occupation': occupation
+                name = name_elem.get_text(strip=True)
+                origin_el = card.find('div', {'name': 'nationality-country'})
+                job_el = card.find('div', {'name': 'jobTitle-employerName'})
+                edu_el = card.find('div', {'name': 'education'})
+                student_data[name] = {
+                    'origin': origin_el.get_text(strip=True) if origin_el else 'N/A',
+                    'education': edu_el.get_text(strip=True) if edu_el else 'N/A',
+                    'previous_occupation': job_el.get_text(strip=True) if job_el else 'N/A',
                 }
-
-            except Exception as e:
-                print(f"    Warning: Error parsing student card: {e}")
+            except Exception:
                 continue
-
-        # Match study group members with extracted data
-        found_count = 0
         for member in self.study_group_members:
-            if member in student_data:
-                self.member_details[member] = student_data[member]
-                found_count += 1
-            else:
-                # Try partial match (first name + last name)
-                matched = False
-                for full_name, data in student_data.items():
-                    if member.lower() in full_name.lower() or full_name.lower() in member.lower():
-                        self.member_details[member] = data
-                        found_count += 1
-                        matched = True
-                        break
-
-                if not matched:
-                    # No match found
-                    self.member_details[member] = {
-                        'origin': 'Not found in Class List',
-                        'education': 'Not found in Class List',
-                        'previous_occupation': 'Not found in Class List'
-                    }
-
-        print(f"  ✓ Extracted details for {found_count}/{len(self.study_group_members)} members")
+            self.member_details[member] = student_data.get(member, {'origin': 'N/A', 'education': 'N/A', 'previous_occupation': 'N/A'})
 
     def _create_placeholder_member_details(self):
-        """Create placeholder data for members"""
+        """Create placeholder data for members."""
         for member in self.study_group_members:
-            self.member_details[member] = {
-                'origin': 'TBD - needs Class List access',
-                'education': 'TBD - needs Class List access',
-                'previous_occupation': 'TBD - needs Class List access'
-            }
+            self.member_details[member] = {'origin': 'TBD', 'education': 'TBD', 'previous_occupation': 'TBD'}
 
-        print(f"✓ Created placeholder data for {len(self.member_details)} members")
-
-    # ==================== REPORT GENERATION ====================
+    # ==================== CANVAS API EXTRACTION ====================
 
     def _extract_via_canvas_api(self):
-        """
-        Extract assignments using Canvas LMS API instead of web scraping.
-        Used when ENABLE_CANVAS_LMS_INTEGRATION is True.
-        """
+        """Extract data via Canvas LMS API instead of web scraping."""
         if not ENABLE_CANVAS_LMS_INTEGRATION:
             return False
-
-        print("\n" + "="*80)
-        print("CANVAS API EXTRACTION (replacing web scraper)")
-        print("="*80)
-
         try:
             from services.canvas_integration import CanvasAPIClient
             client = CanvasAPIClient()
-
-            print("\nFetching courses from Canvas API...")
-            courses = client.get_courses()
-            print(f"Found {len(courses)} courses")
-
-            print("Fetching upcoming assignments...")
             assignments = client.get_upcoming_assignments()
-            print(f"Found {len(assignments)} upcoming assignments")
-
             # Feature flag: ENABLE_ASSIGNMENT_PRIORITY_SCORING
             if ENABLE_ASSIGNMENT_PRIORITY_SCORING:
-                print("\nScoring assignment priorities (AI-powered)...")
                 try:
                     from services.ai_service import AssignmentPriorityScorer
-                    scorer = AssignmentPriorityScorer()
-                    assignments = scorer.score_assignments(assignments, self.study_group_members)
-                    for a in assignments:
-                        print(f"  [{a.get('priority_label', 'N/A')}] {a.get('title', 'Unknown')}")
-                except Exception as e:
-                    print(f"  Priority scoring failed: {e}")
-
+                    assignments = AssignmentPriorityScorer().score_assignments(assignments, self.study_group_members)
+                except Exception:
+                    pass
             self.assignments = assignments
-
-            print("\nFetching group members...")
             members = client.get_group_members('self')
             if members:
                 self.study_group_members = [m.get('name', '') for m in members]
-                print(f"Found {len(self.study_group_members)} group members")
-
             return True
-
-        except Exception as e:
-            print(f"Canvas API extraction failed: {e}")
-            print("Falling back to web scraper...")
+        except Exception:
             return False
 
+    # ==================== POST-PROCESSING ====================
+
     def _sync_to_calendars(self):
-        """Sync extracted assignments to external calendars based on feature flags."""
+        """Sync assignments to external calendars based on feature flags."""
         if ENABLE_GRAPH_CALENDAR_SYNC:
-            print("\nSyncing to Microsoft Calendar (Graph API)...")
             try:
                 from services.calendar_service import GraphCalendarSync
                 graph = GraphCalendarSync()
-                for assignment in self.assignments[:5]:
-                    graph.create_event(
-                        title=f"Due: {assignment.get('title', 'Unknown')}",
-                        start_time=assignment.get('due_date', ''),
-                        end_time=assignment.get('due_date', ''),
-                    )
-                print("\u2713 Synced to Microsoft Calendar")
-            except Exception as e:
-                print(f"  Calendar sync failed: {e}")
-
+                for a in self.assignments[:5]:
+                    graph.create_event(title=f"Due: {a.get('title', '')}", start_time=a.get('due_date', ''), end_time=a.get('due_date', ''))
+            except Exception:
+                pass
         if ENABLE_GOOGLE_CALENDAR_SYNC:
-            print("\nSyncing to Google Calendar...")
             try:
                 from services.calendar_service import GoogleCalendarSync
-                gcal = GoogleCalendarSync()
-                gcal.sync_study_sessions([])
-                print("\u2713 Synced to Google Calendar")
-            except Exception as e:
-                print(f"  Google Calendar sync failed: {e}")
+                GoogleCalendarSync().get_events(datetime.now().isoformat(), (datetime.now() + timedelta(days=14)).isoformat())
+            except Exception:
+                pass
 
     def _send_notifications(self, report_text):
         """Send notifications about new assignments based on feature flags."""
         if ENABLE_SLACK_NOTIFICATIONS:
-            print("\nSending Slack notification...")
             try:
                 from services.notification_service import SlackNotifier
-                slack = SlackNotifier()
-                slack.send(f"New study group report generated with {len(self.assignments)} assignments")
-                print("\u2713 Slack notification sent")
-            except Exception as e:
-                print(f"  Slack notification failed: {e}")
-
+                SlackNotifier().send(f"Report generated: {len(self.assignments)} assignments")
+            except Exception:
+                pass
         if ENABLE_EMAIL_NOTIFICATIONS:
-            print("\nSending email notification...")
             try:
                 from services.notification_service import EmailNotifier
-                email_notifier = EmailNotifier()
-                for assignment in self.assignments[:3]:
-                    email_notifier.send_assignment_reminder('team@london.edu', assignment)
-                print("\u2713 Email notifications sent")
-            except Exception as e:
-                print(f"  Email notification failed: {e}")
+                notifier = EmailNotifier()
+                for a in self.assignments[:3]:
+                    notifier.send_assignment_reminder('team@london.edu', a)
+            except Exception:
+                pass
 
     def _track_analytics(self):
         """Track analytics metrics based on feature flags."""
         if ENABLE_ANALYTICS_DASHBOARD:
-            print("\nTracking analytics...")
             try:
                 from services.analytics_service import AnalyticsEngine
-                analytics = AnalyticsEngine()
-                analytics.track_assignment_submission({
-                    'count': len(self.assignments),
-                    'date': datetime.now().isoformat(),
-                })
-                print("\u2713 Analytics tracked")
-            except Exception as e:
-                print(f"  Analytics tracking failed: {e}")
-
+                AnalyticsEngine().track_assignment_submission({'count': len(self.assignments)})
+            except Exception:
+                pass
         if ENABLE_STUDY_STREAK_TRACKING:
-            print("\nUpdating study streaks...")
             try:
                 from services.analytics_service import StudyStreakTracker
                 tracker = StudyStreakTracker()
                 for member in self.study_group_members:
-                    result = tracker.record_session(member)
-                    if result and result.get('new_milestone'):
-                        print(f"  {member} reached milestone: {result['new_milestone']} days!")
-                print("\u2713 Study streaks updated")
-            except Exception as e:
-                print(f"  Streak tracking failed: {e}")
+                    tracker.record_session(member)
+            except Exception:
+                pass
+
+    # ==================== REPORT GENERATION ====================
 
     def _generate_legacy_report(self):
-        """
-        Generate the old verbose report format.
-        DEPRECATED: This produces 3x larger output.
-        Gated behind ENABLE_OLD_REPORT_FORMAT flag.
-        """
-        print("Using legacy report format (ENABLE_OLD_REPORT_FORMAT=true)")
-        print("WARNING: Legacy format is 3x larger and wastes tokens")
-
-        report = f"""{'='*80}
-LBS STUDY GROUP MANAGER - DETAILED REPORT
-{'='*80}
-Generated: {datetime.now().strftime('%A, %d %B %Y at %H:%M:%S')}
-Report Version: v1.0 (LEGACY FORMAT)
-{'='*80}
-
-STUDY GROUP MEMBERS:
-{'='*40}
-"""
+        """DEPRECATED: Old verbose report format. Gated behind ENABLE_OLD_REPORT_FORMAT."""
+        report = '=' * 80 + '\nLBS STUDY GROUP - DETAILED REPORT (LEGACY)\n' + '=' * 80 + '\n'
+        report += f"Generated: {datetime.now().strftime('%A, %d %B %Y at %H:%M:%S')}\n\nMEMBERS:\n"
         for i, member in enumerate(self.study_group_members, 1):
-            report += f"\nMember #{i}: {member}\n"
-            details = self.member_details.get(member, {})
-            if details:
-                report += f"  Full Name: {member}\n"
-                report += f"  Country of Origin: {details.get('origin', 'N/A')}\n"
-                report += f"  Education: {details.get('education', 'N/A')}\n"
-                report += f"  Previous Occupation: {details.get('previous_occupation', 'N/A')}\n"
-                report += f"  {'='*40}\n"
-
-        report += f"\n\nUPCOMING ASSIGNMENTS:\n{'='*40}\n"
-        for i, assignment in enumerate(self.assignments, 1):
-            report += f"\nAssignment #{i}:\n"
-            report += f"  Title: {assignment.get('title', 'N/A')}\n"
-            report += f"  Course: {assignment.get('course', 'N/A')}\n"
-            report += f"  Type: {assignment.get('type', 'N/A')}\n"
-            report += f"  Due Date: {assignment.get('due_date', 'N/A')}\n"
-            report += f"  Due Day: {assignment.get('due_day', 'N/A')}\n"
-            report += f"  {'='*40}\n"
-
-        report += f"\n\nEND OF REPORT\n{'='*80}\n"
+            d = self.member_details.get(member, {})
+            report += f"\n{i}. {member} | {d.get('origin', 'N/A')} | {d.get('education', 'N/A')} | {d.get('previous_occupation', 'N/A')}\n"
+        report += '\nASSIGNMENTS:\n'
+        for i, a in enumerate(self.assignments, 1):
+            report += f"{i}. {a.get('title', 'N/A')} | {a.get('course', 'N/A')} | Due: {a.get('due_date', 'N/A')}\n"
         return report
 
     def generate_markdown_report(self, output_file='study_group_report.md'):
-        """Generate concise report for LLM analysis (minified format)"""
-        print("\n" + "="*80)
-        print("STEP 5: GENERATE REPORT")
-        print("="*80)
-
-        # Feature flag: ENABLE_OLD_REPORT_FORMAT - use verbose old format
+        """Generate concise report for LLM analysis."""
+        # Feature flag: ENABLE_OLD_REPORT_FORMAT
         if ENABLE_OLD_REPORT_FORMAT:
             return self._generate_legacy_report()
 
-        report = []
-
-        # Header - single line
-        report.append(f"REPORT {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-        report.append("")
-
-        # Assignments - compact format
-        report.append("ASSIGNMENTS:")
+        report = [f"REPORT {datetime.now().strftime('%Y-%m-%d %H:%M')}", '', 'ASSIGNMENTS:']
         if not self.assignments:
-            report.append("None")
+            report.append('None')
         else:
             for item in self.assignments:
-                # Format: DATE TIME | COURSE | TYPE | TITLE
                 date_str = item['due_datetime'].strftime('%Y-%m-%d %H:%M')
-                course = item.get('course', 'Unknown')
-                item_type = item.get('type', 'Assignment')
-                title = item.get('title', 'Untitled')
-                report.append(f"{date_str} | {course} | {item_type} | {title}")
+                report.append(f"{date_str} | {item.get('course', 'Unknown')} | {item.get('type', 'Assignment')} | {item.get('title', 'Untitled')}")
 
-        report.append("")
-
-        # Events - compact format
-        report.append("EVENTS:")
+        report.extend(['', 'EVENTS:'])
         if not self.events:
-            report.append("None")
+            report.append('None')
         else:
             for item in self.events:
-                # Format: DATE TIME | COURSE | TITLE
                 date_str = item['due_datetime'].strftime('%Y-%m-%d %H:%M')
-                course = item.get('course', 'Unknown')
-                title = item.get('title', 'Untitled')
-                report.append(f"{date_str} | {course} | {title}")
+                report.append(f"{date_str} | {item.get('course', 'Unknown')} | {item.get('title', 'Untitled')}")
 
-        report.append("")
+        report.extend(['', 'MEMBERS:'])
+        for member in self.study_group_members:
+            d = self.member_details.get(member, {})
+            report.append(f"{member} | {d.get('origin', 'N/A')} | {d.get('education', 'N/A')} | {d.get('previous_occupation', 'N/A')}")
 
-        # Members - compact format
-        report.append("MEMBERS:")
-        if not self.study_group_members:
-            report.append("None")
-        else:
-            for i, member in enumerate(self.study_group_members, 1):
-                # Format: NAME | ORIGIN | EDUCATION | OCCUPATION
-                if member in self.member_details:
-                    details = self.member_details[member]
-                    origin = details.get('origin', 'N/A')
-                    education = details.get('education', 'N/A')
-                    occupation = details.get('previous_occupation', 'N/A')
-                    report.append(f"{member} | {origin} | {education} | {occupation}")
-                else:
-                    report.append(f"{member} | N/A | N/A | N/A")
-
-        # Write to file
         report_text = '\n'.join(report)
-
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(report_text)
-
-        char_count = len(report_text)
-        print(f"✓ Report generated: {output_file}")
-        print(f"✓ Report size: {char_count:,} characters (~{char_count//4:,} tokens)")
-
+        print(f'Report generated: {output_file} ({len(report_text)} chars)')
         return report_text
 
     # ==================== MAIN WORKFLOW ====================
 
     def run(self):
-        """Execute the complete workflow"""
+        """Execute the complete workflow."""
         try:
-            print("\n" + "="*80)
             print("LBS STUDY GROUP MANAGER")
-            print("="*80)
-
             # Feature flag: ENABLE_CANVAS_LMS_INTEGRATION
-            # Try Canvas API first if enabled, fall back to web scraping
             if ENABLE_CANVAS_LMS_INTEGRATION and not USE_LEGACY_WEBSCRAPER:
-                print("\nUsing Canvas LMS API for data extraction...")
-                if self._extract_via_canvas_api():
-                    print("✓ Canvas API extraction successful")
-                else:
-                    print("⚠ Canvas API failed, falling back to web scraper")
+                print("Using Canvas LMS API...")
+                if not self._extract_via_canvas_api():
+                    print("Canvas API failed, falling back to web scraper")
                     if not self.login_with_cookies():
-                        print("\n✗ Login failed")
                         return False
                     self.extract_assignments_from_dashboard()
                     self.find_study_group_members()
                     self.extract_member_details_from_class_list()
             elif USE_LEGACY_WEBSCRAPER or not ENABLE_CANVAS_LMS_INTEGRATION:
-                # Legacy path: web scraping
                 if USE_LEGACY_WEBSCRAPER:
-                    print("\nUsing legacy web scraper (USE_LEGACY_WEBSCRAPER=true)")
-                    print("WARNING: Consider migrating to Canvas API integration")
-
-                # Step 1: Login and setup browser
+                    print("Using legacy web scraper (DEPRECATED)")
                 if not self.login_with_cookies():
-                    print("\n✗ Login failed")
                     return False
-
-                # Step 2: Extract assignments from calendar agenda
                 self.extract_assignments_from_dashboard()
-
-                # Step 3: Find study group members
                 self.find_study_group_members()
-
-                # Step 4: Get member details from class list
                 self.extract_member_details_from_class_list()
             else:
-                print("\n✗ No data source configured!")
-                print("Enable ENABLE_CANVAS_LMS_INTEGRATION or USE_LEGACY_WEBSCRAPER")
+                print("No data source configured!")
                 return False
 
-            # Feature flag: LEGACY_MEMBER_SYNC - Also import from CSV
+            # Feature flag: LEGACY_MEMBER_SYNC
             if LEGACY_MEMBER_SYNC:
-                print("\nRunning legacy CSV member sync (LEGACY_MEMBER_SYNC=true)...")
                 try:
                     from services.canvas_integration import LegacyCSVMemberSync
-                    csv_sync = LegacyCSVMemberSync()
-                    csv_members = csv_sync.sync_from_csv_directory()
-                    if csv_members:
-                        print(f"Found {len(csv_members)} members from CSV")
-                except Exception as e:
-                    print(f"CSV sync failed: {e}")
+                    LegacyCSVMemberSync().import_members_from_csv('data/members.csv')
+                except Exception:
+                    pass
 
-            # Step 5: Generate report
             report = self.generate_markdown_report()
-
-            # Feature flag-gated post-processing
             self._sync_to_calendars()
             self._send_notifications(report)
             self._track_analytics()
-
-            print("\n" + "="*80)
-            print("✓ COMPLETE!")
-            print("="*80)
-            print("\nReport saved to: study_group_report.md")
-            print("You can now upload this file to an LLM for analysis and recommendations.")
-
-            # Auto-close when run from web UI (no user input needed)
-            # input("\n\nPress Enter to close browser and exit...")
-
+            print("COMPLETE!")
             return True
 
         except Exception as e:
-            print(f"\n✗ Error during execution: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"Error: {e}")
             return False
-
         finally:
-            # Cleanup
             if self.driver:
                 self.driver.quit()
 
 
 def main():
-    print("="*80)
-    print("LBS STUDY GROUP MANAGER")
-    print("="*80)
-    print("\nThis script will:")
-    print("  1. Login to learning.london.edu (using saved session if available)")
-    print("  2. Extract upcoming assignments from Dashboard")
-    print("  3. Find your Study Group members")
-    print("  4. Extract member details from Class List")
-    print("  5. Generate markdown report for LLM analysis")
-    print("\n" + "="*80 + "\n")
-
     manager = StudyGroupManager()
     manager.run()
 
